@@ -22,6 +22,10 @@ EXTRA_DIST += version.c.in
 noinst_HEADERS += nifty.h
 
 
+bin_PROGRAMS += dtcast
+BUILT_SOURCES += dtcast.yucc
+
+
 ## version rules
 version.c: version.c.in $(top_builddir)/.version
 	$(AM_V_GEN) PATH="$(top_builddir)/build-aux:$${PATH}" \

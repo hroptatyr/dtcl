@@ -1,0 +1,6 @@
+Usage: dtcast FORMULA < FILE
+
+Like R's dcast.
+
+  -H, --header          Header is present in FILE.
+  -C, --cast=COL...     Cast COLs into columns.
