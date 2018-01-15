@@ -22,6 +22,13 @@ static size_t *zccvo;
  * the value */
 static size_t **ccvo;
 
+static size_t nlhs;
+static union {
+	size_t v;
+	size_t *p;
+} lhs = {0U};
+static size_t rhs = 1U;
+
 
 static void
 __attribute__((format(printf, 1, 2)))
@@ -171,6 +178,24 @@ MurmurHash64A(const void *key, size_t len)
 #define hash(x, y)	MurmurHash64A((x), (y))
 
 
+static int
+chck(size_t ncol)
+{
+	if (!nlhs) {
+		if (UNLIKELY(lhs.v >= ncol)) {
+			return -1;
+		}
+	} else for (size_t i = 0U; i < nlhs; i++) {
+		if (UNLIKELY(lhs.p[i] >= ncol)) {
+			return -1;
+		}
+	}
+	if (UNLIKELY(rhs >= ncol)) {
+		return -1;
+	}
+	return 0;
+}
+
 static size_t
 toklng(const char *ln, size_t lz)
 {
@@ -229,6 +254,11 @@ Error: cannot read lines");
 Error: cannot determine number of columns");
 		rc = -1;
 		goto out;
+	} else if (UNLIKELY(chck(ncol) < 0)) {
+		errno = 0, error("\
+Error: less columns present than needed for LHS~RHS and value");
+		rc = -1;
+		goto out;
 	} else if (UNLIKELY(!(coff = calloc(ncol + 1U, sizeof(*coff))))) {
 		error("\
 Error: cannot allocate memory to hold one line");
@@ -253,7 +283,16 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 		}
 
 		/* hash dimension columns */
-		with (uint64_t d = hash(line + coff[0U], coff[1U] - coff[0U])) {
+		with (uint64_t d = 0U) {
+			if (!nlhs) {
+				const size_t of = coff[lhs.v + 0U];
+				const size_t eo = coff[lhs.v + 1U];
+				d = hash(line + of, eo - of - 1U);
+			} else for (size_t i = 0U; i < nlhs; i++) {
+				const size_t of = coff[lhs.p[i] + 0U];
+				const size_t eo = coff[lhs.p[i] + 1U];
+				d ^= hash(line + of, eo - of - 1U);
+			}
 			if (UNLIKELY(d != last_d)) {
 				prnt();
 				rset();
@@ -262,8 +301,12 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 		}
 
 		/* store value */
-		with (uint64_t c = hash(line + coff[1U], coff[2U] - coff[1U] - 1U)) {
+		with (uint64_t c) {
+			const size_t of = coff[rhs + 0U];
+			const size_t eo = coff[rhs + 1U];
 			size_t j;
+
+			c = hash(line + of, eo - of - 1U);
 
 			for (j = 0U; j < ncc; j++) {
 				if (cc[j] == c) {
@@ -285,6 +328,77 @@ out:
 	return rc;
 }
 
+static int
+snrf(char *const *args, size_t nargs)
+{
+	size_t i = 0U;
+	size_t zlhs = 0U;
+	long unsigned int x;
+	char *on;
+
+	if (UNLIKELY(!nargs)) {
+		return -1;
+	}
+
+next:
+	on = args[i];
+redo:
+	x = strtoul(on, &on, 10);
+	switch (*on++) {
+	case '+':
+		/* more to come */
+		if (UNLIKELY(nlhs >= zlhs)) {
+			zlhs = (zlhs * 2U) ?: 8U;
+			lhs.p = calloc(zlhs, sizeof(*lhs.p));
+		}
+		lhs.p[nlhs++] = x - (x > 0U);
+		goto redo;
+	case '~':
+		/* rhs coming */
+		if (!nlhs) {
+			lhs.v = x - (x > 0U);
+		} else {
+			if (UNLIKELY(nlhs >= zlhs)) {
+				zlhs = (zlhs * 2U) ?: 8U;
+				lhs.p = calloc(zlhs, sizeof(*lhs.p));
+			}
+			lhs.p[nlhs++] = x - (x > 0U);
+		}
+		goto rhs;
+	case '\0':
+		if (UNLIKELY(nlhs >= zlhs)) {
+			zlhs = (zlhs * 2U) ?: 8U;
+			lhs.p = calloc(zlhs, sizeof(*lhs.p));
+		}
+		if (x) {
+			lhs.p[nlhs++] = x - 1;
+			if (++i < nargs) {
+				goto next;
+			}
+		}
+	default:
+		return -1;
+	}
+rhs:
+	if (UNLIKELY(!(rhs = strtoul(on, &on, 10)))) {
+		return -1;
+	} else if (UNLIKELY(*on)) {
+		return -1;
+	}
+	/* we're 0-based internally */
+	rhs--;
+
+	/* check that LHS and RHS are disjoint */
+	if (!nlhs && UNLIKELY(lhs.v == rhs)) {
+		return -1;
+	} else for (i = 0U; i < nlhs; i++) {
+		if (UNLIKELY(lhs.p[i] == rhs)) {
+			return -1;
+		}
+	}
+	return 0;
+}
+
 
 #include "dtcast.yucc"
 
@@ -295,6 +409,14 @@ main(int argc, char *argv[])
 	int rc = 0;
 
 	if (yuck_parse(argi, argc, argv) < 0) {
+		rc = 1;
+		goto out;
+	}
+
+	/* snarf formula */
+	if (UNLIKELY(snrf(argi->args, argi->nargs) < 0)) {
+		error("\
+Error: cannot interpret formula");
 		rc = 1;
 		goto out;
 	}
@@ -376,6 +498,10 @@ Error: cannot allocate space for value sizes");
 		free(ccvo[i]);
 	}
 	free(ccvo);
+
+	if (nlhs) {
+		free(lhs.p);
+	}
 
 out:
 	yuck_free(argi);
