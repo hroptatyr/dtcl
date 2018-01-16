@@ -566,6 +566,8 @@ redo:
 	}
 rhs:
 	if (UNLIKELY(!(rhs = strtoul(on, &on, 10)))) {
+		/* skip white space */
+		for (; (unsigned char)(*on - 1) < ' '; on++);
 		if (*on == '.') {
 			/* bla ~ . */
 			rhs--;
