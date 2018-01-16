@@ -60,6 +60,10 @@ static size_t *zccvo;
  * cast column as per id variable then store CCV[c] + CCVO[c][nccv]
  * the value */
 static size_t **ccvo;
+/* buffer of the dimension line (LHS) */
+static size_t ndim;
+static size_t zdim;
+static char *dim;
 
 static size_t nlhs;
 static union {
@@ -115,27 +119,31 @@ prnt:
 		}
 	}
 more:
+	/* dimension line */
+	fwrite(dim, 1, ndim, stdout);
 	for (size_t j = 0U; j < ncc; j++) {
+		fputc('\t', stdout);
 		if (nccv[j]) {
 			fwrite(ccv[j] + ccvo[j][m[j]], 1,
 			       ccvo[j][m[j] + 1U] - ccvo[j][m[j]], stdout);
 		}
-		fputc('\t' + (j + 1U >= ncc), stdout);
 	}
 	if (ns) {
 		/* multi-step */
 		for (size_t i = 0U; i < ns; i++) {
 			if (++m[s[i]] < nccv[s[i]]) {
+				fputc('\n', stdout);
 				goto more;
 			}
 			m[s[i]] = 0U;
 		}
 	}
+	fputc('\n', stdout);
 	return;
 }
 
 static void
-rset(void)
+rset(const char *line, const size_t *coff)
 {
 	memset(nccv, 0, ncc * sizeof(*nccv));
 
@@ -143,6 +151,29 @@ rset(void)
 		ccvo[j][0U] = 0U;
 		ccvo[j][1U] = 0U;
 	}
+
+	/* make up dimension line */
+	if (!nlhs) {
+		const size_t of = coff[lhs.v + 0U];
+		const size_t eo = coff[lhs.v + 1U];
+		if (UNLIKELY(eo - of >= zdim)) {
+			while ((zdim = (zdim * 2U) ?: 64U) < eo - of);
+			dim = realloc(dim, zdim * sizeof(*dim));
+		}
+		memcpy(dim, line + of, ndim = eo - of);
+	} else for (size_t i = 0U, n = 0U; i < nlhs; i++, ndim = n) {
+		const size_t of = coff[lhs.p[i] + 0U];
+		const size_t eo = coff[lhs.p[i] + 1U];
+		if (UNLIKELY(n + eo - of >= zdim)) {
+			while ((zdim = (zdim * 2U) ?: 64U) < n + eo - of);
+			dim = realloc(dim, zdim * sizeof(*dim));
+		}
+		memcpy(dim + n, line + of, eo - of - 1U);
+		n += eo - of - 1U;
+		dim[n++] = '\t';
+	}
+	/* omit trailing separator */
+	ndim--;
 	return;
 }
 
@@ -369,7 +400,7 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 			}
 			if (UNLIKELY(d != last_d)) {
 				prnt();
-				rset();
+				rset(line, coff);
 				last_d = d;
 			}
 		}
@@ -397,6 +428,8 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 			bang(line + of, eo - of - 1U, j);
 		}
 	}
+	/* print the last one */
+	prnt();
 
 	free(coff);
 out:
@@ -568,6 +601,10 @@ Error: cannot allocate space for value sizes");
 		free(ccvo[i]);
 	}
 	free(ccvo);
+
+	if (LIKELY(zdim)) {
+		free(dim);
+	}
 
 	if (nlhs) {
 		free(lhs.p);
