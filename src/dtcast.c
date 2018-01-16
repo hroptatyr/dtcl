@@ -512,6 +512,9 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 				if (UNLIKELY(adcc(c) < 0)) {
 					break;
 				}
+			} else {
+				/* column we didn't want */
+				continue;
 			}
 		bang:
 			/* bang */
