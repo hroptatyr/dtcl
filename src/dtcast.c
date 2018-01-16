@@ -28,6 +28,8 @@ static union {
 	size_t *p;
 } lhs = {0U};
 static size_t rhs = 1U;
+/* this one is 1-based */
+static size_t vhs;
 
 
 static void
@@ -178,6 +180,32 @@ MurmurHash64A(const void *key, size_t len)
 #define hash(x, y)	MurmurHash64A((x), (y))
 
 
+static size_t
+mvhs(size_t ncol)
+{
+/* one pass of bubble sort */
+	size_t v;
+
+	for (v = ncol; --v;) {
+		if (!nlhs) {
+			if (lhs.v == v) {
+				goto next;
+			}
+		} else for (size_t i = 0U; i < nlhs; i++) {
+			if (lhs.p[i] == v) {
+				goto next;
+			}
+		}
+		if (rhs == v) {
+			goto next;
+		}
+		return v + 1U;
+	next:
+		continue;
+	}
+	return 0;
+}
+
 static int
 chck(size_t ncol)
 {
@@ -191,6 +219,13 @@ chck(size_t ncol)
 		}
 	}
 	if (UNLIKELY(rhs >= ncol)) {
+		return -1;
+	}
+	if (vhs && vhs > ncol) {
+		return -1;
+	}
+	/* determine VHS as the rightmost column not used by LHS nor RHS */
+	if (UNLIKELY(!vhs && !(vhs = mvhs(ncol)))) {
 		return -1;
 	}
 	return 0;
@@ -302,8 +337,8 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 
 		/* store value */
 		with (uint64_t c) {
-			const size_t of = coff[rhs + 0U];
-			const size_t eo = coff[rhs + 1U];
+			size_t of = coff[rhs + 0U];
+			size_t eo = coff[rhs + 1U];
 			size_t j;
 
 			c = hash(line + of, eo - of - 1U);
@@ -318,7 +353,9 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 				break;
 			}
 			/* bang */
-			bang(line + coff[2U], coff[3U] - coff[2U] - 1U, j);
+			of = coff[vhs - 1U];
+			eo = coff[vhs];
+			bang(line + of, eo - of - 1U, j);
 		}
 	}
 
@@ -419,6 +456,16 @@ main(int argc, char *argv[])
 Error: cannot interpret formula");
 		rc = 1;
 		goto out;
+	}
+
+	if (argi->value_arg) {
+		char *on;
+		if (!(vhs = strtoul(argi->value_arg, &on, 10)) || *on) {
+			errno = 0, error("\
+Error: invalide value column");
+			rc = 1;
+			goto out;
+		}
 	}
 
 	if ((ncc = argi->cast_nargs)) {
