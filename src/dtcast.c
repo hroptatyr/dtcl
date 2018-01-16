@@ -46,7 +46,10 @@
 #include "nifty.h"
 
 static int hdrp = 0;
+/* number of cast columns */
 static size_t ncc;
+static size_t zcc;
+/* cast column hash values */
 static uint64_t *cc;
 /* number of distinct values per cast column */
 static size_t *nccv;
@@ -92,6 +95,54 @@ error(const char *fmt, ...)
 	return;
 }
 
+/* murmur2 */
+#define HASHSIZE	(64U / 8U)
+
+static uint64_t
+MurmurHash64A(const void *key, size_t len)
+{
+	const uint64_t m = 0xc6a4a7935bd1e995ULL;
+	const int r = 47;
+
+	uint64_t h = (len * m);
+
+	const uint64_t * data = (const uint64_t *)key;
+	const uint64_t * end = data + (len/8);
+
+	while(data != end) {
+		uint64_t k = *data++;
+
+		k *= m;
+		k ^= k >> r;
+		k *= m;
+
+		h ^= k;
+		h *= m;
+	}
+
+	const unsigned char * data2 = (const unsigned char*)data;
+
+	switch(len & 7) {
+	case 7: h ^= (uint64_t)(data2[6]) << 48;
+	case 6: h ^= (uint64_t)(data2[5]) << 40;
+	case 5: h ^= (uint64_t)(data2[4]) << 32;
+	case 4: h ^= (uint64_t)(data2[3]) << 24;
+	case 3: h ^= (uint64_t)(data2[2]) << 16;
+	case 2: h ^= (uint64_t)(data2[1]) << 8;
+	case 1: h ^= (uint64_t)(data2[0]);
+		h *= m;
+		break;
+	};
+
+	h ^= h >> r;
+	h *= m;
+	h ^= h >> r;
+
+	return h;
+} 
+
+#define hash(x, y)	MurmurHash64A((x), (y))
+
 
 /* ccv operations */
 static void
@@ -101,8 +152,15 @@ prnt(void)
 	size_t s[ncc];
 	size_t ns = 0U;
 
+	if (UNLIKELY(!ndim)) {
+		/* no dimensions? */
+		return;
+	}
+	if (!(rhs + 1U)) {
+		/* just the dimension */
+		goto more;
+	}
 	memset(m, 0, sizeof(m));
-	memset(s, 0, sizeof(s));
 	for (size_t j = 0U; j < ncc; j++) {
 		if (nccv[j]) {
 			/* at least one value */
@@ -113,6 +171,7 @@ prnt(void)
 
 prnt:
 	/* determine order of stepping */
+	memset(s, 0, sizeof(s));
 	for (size_t j = ncc; j > 0U; j--) {
 		if (nccv[j - 1U] > 1U) {
 			s[ns++] = j - 1U;
@@ -200,54 +259,79 @@ bang(const char *str, size_t len, size_t j)
 	return;
 }
 
-
-/* murmur2 */
-#define HASHSIZE	(64U / 8U)
-
-static uint64_t
-MurmurHash64A(const void *key, size_t len)
+static void
+mtcc(void)
 {
-	const uint64_t m = 0xc6a4a7935bd1e995ULL;
-	const int r = 47;
+	zcc = 0U;
+	return;
+}
 
-	uint64_t h = (len * m);
-
-	const uint64_t * data = (const uint64_t *)key;
-	const uint64_t * end = data + (len/8);
-
-	while(data != end) {
-		uint64_t k = *data++;
-
-		k *= m; 
-		k ^= k >> r; 
-		k *= m; 
-    
-		h ^= k;
-		h *= m; 
+static int
+stcc(char *const *args, size_t nargs)
+{
+	if (!(ncc = nargs)) {
+		;
+	} else if (UNLIKELY((cc = calloc(ncc, sizeof(*cc))) == NULL)) {
+		return -1;
+	} else if (UNLIKELY((nccv = calloc(ncc, sizeof(*nccv))) == NULL)) {
+		return -1;
+	} else if (UNLIKELY((ccv = calloc(ncc, sizeof(*ccv))) == NULL)) {
+		return -1;
+	} else if (UNLIKELY((ccvo = calloc(ncc, sizeof(*ccvo))) == NULL)) {
+		return -1;
+	} else if (UNLIKELY((zccv = calloc(ncc, sizeof(*zccv))) == NULL)) {
+		return -1;
+	} else if (UNLIKELY((zccvo = calloc(ncc, sizeof(*zccvo))) == NULL)) {
+		return -1;
 	}
+	for (size_t j = 0U; j < ncc; j++) {
+		ccvo[j] = calloc(8U, sizeof(*ccvo[j]));
+		zccvo[j] = 8U;
+	}
+	for (size_t i = 0U; i < ncc; i++) {
+		const char *c = args[i];
+		cc[i] = hash(c, strlen(c));
+	}
+	return 0;
+}
 
-	const unsigned char * data2 = (const unsigned char*)data;
+static int
+adcc(uint64_t c)
+{
+	if (UNLIKELY(ncc >= zcc)) {
+		const size_t nuz = (zcc * 2U) ?: 64U;
 
-	switch(len & 7) {
-	case 7: h ^= (uint64_t)(data2[6]) << 48;
-	case 6: h ^= (uint64_t)(data2[5]) << 40;
-	case 5: h ^= (uint64_t)(data2[4]) << 32;
-	case 4: h ^= (uint64_t)(data2[3]) << 24;
-	case 3: h ^= (uint64_t)(data2[2]) << 16;
-	case 2: h ^= (uint64_t)(data2[1]) << 8;
-	case 1: h ^= (uint64_t)(data2[0]);
-		h *= m;
-		break;
-	};
- 
-	h ^= h >> r;
-	h *= m;
-	h ^= h >> r;
+		cc = realloc(cc, nuz * sizeof(*cc));
+		nccv = realloc(nccv, nuz * sizeof(*nccv));
+		ccv = realloc(ccv, nuz * sizeof(*ccv));
+		ccvo = realloc(ccvo, nuz * sizeof(*ccvo));
+		zccv = realloc(zccv, nuz * sizeof(*zccv));
+		zccvo = realloc(zccvo, nuz * sizeof(*zccvo));
 
-	return h;
-} 
+		if (UNLIKELY(cc == NULL)) {
+			return -1;
+		} else if (UNLIKELY(nccv == NULL)) {
+			return -1;
+		} else if (UNLIKELY(ccv == NULL)) {
+			return -1;
+		} else if (UNLIKELY(ccvo == NULL)) {
+			return -1;
+		} else if (UNLIKELY(zccv == NULL)) {
+			return -1;
+		} else if (UNLIKELY(zccvo == NULL)) {
+			return -1;
+		}
+		for (size_t j = zcc; j < nuz; j++) {
+			ccvo[j] = calloc(8U, sizeof(*ccvo[j]));
+			zccvo[j] = 8U;
+		}
 
-#define hash(x, y)	MurmurHash64A((x), (y))
+		zcc = nuz;
+	}
+	/* really add him now */
+	cc[ncc++] = c;
+	return 0;
+}
 
 
 static size_t
@@ -288,7 +372,7 @@ chck(size_t ncol)
 			return -1;
 		}
 	}
-	if (UNLIKELY(rhs >= ncol)) {
+	if (UNLIKELY(rhs >= ncol && rhs + 1U)) {
 		return -1;
 	}
 	if (vhs && vhs > ncol) {
@@ -402,26 +486,34 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 				prnt();
 				rset(line, coff);
 				last_d = d;
+				/* materialise cast cols */
+				if (UNLIKELY(zcc)) {
+					mtcc();
+				}
 			}
 		}
 
 		/* store value */
-		with (uint64_t c) {
+		if (rhs < ncol) {
 			size_t of = coff[rhs + 0U];
 			size_t eo = coff[rhs + 1U];
+			const uint64_t c = hash(line + of, eo - of - 1);
 			size_t j;
-
-			c = hash(line + of, eo - of - 1U);
 
 			for (j = 0U; j < ncc; j++) {
 				if (cc[j] == c) {
 					/* found him */
+					goto bang;
+				}
+			}
+
+			if (UNLIKELY(zcc || !ncc)) {
+				/* add him */
+				if (UNLIKELY(adcc(c) < 0)) {
 					break;
 				}
 			}
-			if (UNLIKELY(j >= ncc)) {
-				break;
-			}
+		bang:
 			/* bang */
 			of = coff[vhs - 1U];
 			eo = coff[vhs];
@@ -474,6 +566,11 @@ redo:
 	}
 rhs:
 	if (UNLIKELY(!(rhs = strtoul(on, &on, 10)))) {
+		if (*on == '.') {
+			/* bla ~ . */
+			rhs--;
+			return 0;
+		}
 		return -1;
 	} else if (UNLIKELY(*on)) {
 		return -1;
@@ -524,69 +621,14 @@ Error: invalide value column");
 		}
 	}
 
-	if ((ncc = argi->cast_nargs)) {
-		cc = calloc(ncc, sizeof(*cc));
-
-		if (UNLIKELY(cc == NULL)) {
-			error("\
-Error: cannot allocate space for cast columns");
-			rc = 1;
-			goto out;
-		}
-
-		nccv = calloc(ncc, sizeof(*nccv));
-
-		if (UNLIKELY(nccv == NULL)) {
-			error("\
-Error: cannot allocate space for multiplicity counters");
-			rc = 1;
-			goto out;
-		}
-
-		ccv = calloc(ncc, sizeof(*ccv));
-
-		if (UNLIKELY(ccv == NULL)) {
-			error("\
-Error: cannot allocate space for value cache");
-			rc = 1;
-			goto out;
-		}
-
-		ccvo = calloc(ncc, sizeof(*ccvo));
-
-		if (UNLIKELY(ccvo == NULL)) {
-			error("\
-Error: cannot allocate space for value offsets");
-			rc = 1;
-			goto out;
-		}
-
-		zccv = calloc(ncc, sizeof(*zccv));
-
-		if (UNLIKELY(zccv == NULL)) {
-			error("\
-Error: cannot allocate space for value sizes");
-			rc = 1;
-			goto out;
-		}
-
-		zccvo = calloc(ncc, sizeof(*zccvo));
-
-		if (UNLIKELY(zccvo == NULL)) {
-			error("\
-Error: cannot allocate space for value sizes");
-			rc = 1;
-			goto out;
-		}
-
-		for (size_t j = 0U; j < ncc; j++) {
-			ccvo[j] = calloc(8U, sizeof(*ccvo[j]));
-			zccvo[j] = 8U;
-		}
-	}
-	for (size_t i = 0U; i < argi->cast_nargs; i++) {
-		const char *c = argi->cast_args[i];
-		cc[i] = hash(c, strlen(c));
+	if (!(rhs + 1U)) {
+		/* don't set up cast columns regardless what they specified */
+		;
+	} else if (UNLIKELY(stcc(argi->cast_args, argi->cast_nargs) < 0)) {
+		error("\
+Error: cannot set up cast columns");
+		rc = 1;
+		goto out;
 	}
 
 	rc = proc1() < 0;
@@ -601,10 +643,7 @@ Error: cannot allocate space for value sizes");
 		free(ccvo[i]);
 	}
 	free(ccvo);
-
-	if (LIKELY(zdim)) {
-		free(dim);
-	}
+	free(dim);
 
 	if (nlhs) {
 		free(lhs.p);
