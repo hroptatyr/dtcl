@@ -1,6 +1,6 @@
 Usage: dtcast FORMULA < FILE
 
-Like R's dcast.
+Streaming implementation of data.table's ?dcast.
 
   -H, --header          Header is present in FILE.
   -C, --cast=COL...     Cast COLs into columns.
