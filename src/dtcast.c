@@ -405,21 +405,16 @@ out:
 }
 
 static int
-snrf(char *const *args, size_t nargs)
+snrf(char *formula)
 {
-	size_t i = 0U;
 	size_t zlhs = 0U;
 	long unsigned int x;
-	char *on;
+	char *on = formula;
 
-	if (UNLIKELY(!nargs)) {
-		return -1;
-	}
-
-next:
-	on = args[i];
 redo:
 	x = strtoul(on, &on, 10);
+	/* skip white space */
+	for (; (unsigned char)(*on - 1) < ' '; on++);
 	switch (*on++) {
 	case '+':
 		/* more to come */
@@ -441,17 +436,6 @@ redo:
 			lhs.p[nlhs++] = x - (x > 0U);
 		}
 		goto rhs;
-	case '\0':
-		if (UNLIKELY(nlhs >= zlhs)) {
-			zlhs = (zlhs * 2U) ?: 8U;
-			lhs.p = calloc(zlhs, sizeof(*lhs.p));
-		}
-		if (x) {
-			lhs.p[nlhs++] = x - 1;
-			if (++i < nargs) {
-				goto next;
-			}
-		}
 	default:
 		return -1;
 	}
@@ -467,7 +451,7 @@ rhs:
 	/* check that LHS and RHS are disjoint */
 	if (!nlhs && UNLIKELY(lhs.v == rhs)) {
 		return -1;
-	} else for (i = 0U; i < nlhs; i++) {
+	} else for (size_t i = 0U; i < nlhs; i++) {
 		if (UNLIKELY(lhs.p[i] == rhs)) {
 			return -1;
 		}
@@ -490,7 +474,7 @@ main(int argc, char *argv[])
 	}
 
 	/* snarf formula */
-	if (UNLIKELY(snrf(argi->args, argi->nargs) < 0)) {
+	if (UNLIKELY(!argi->nargs || snrf(*argi->args) < 0)) {
 		error("\
 Error: cannot interpret formula");
 		rc = 1;
