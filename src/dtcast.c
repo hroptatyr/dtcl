@@ -641,9 +641,12 @@ Error: cannot set up cast columns");
 	/* free cast columns */
 	free(cc);
 	free(nccv);
-	free(ccv);
 	free(zccv);
 	free(zccvo);
+	for (size_t i = 0U; i < ncc; i++) {
+		free(ccv[i]);
+	}
+	free(ccv);
 	for (size_t i = 0U; i < ncc; i++) {
 		free(ccvo[i]);
 	}
