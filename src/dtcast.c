@@ -179,11 +179,11 @@ prnt:
 	}
 more:
 	/* dimension line */
-	fwrite(dim, 1, ndim, stdout);
+	fwrite(dim, sizeof(*dim), ndim, stdout);
 	for (size_t j = 0U; j < ncc; j++) {
 		fputc('\t', stdout);
 		if (nccv[j]) {
-			fwrite(ccv[j] + ccvo[j][m[j]], 1,
+			fwrite(ccv[j] + ccvo[j][m[j]], sizeof(char),
 			       ccvo[j][m[j] + 1U] - ccvo[j][m[j]], stdout);
 		}
 	}
@@ -445,7 +445,7 @@ Error: cannot determine number of columns");
 		goto out;
 	} else if (UNLIKELY(chck(ncol) < 0)) {
 		errno = 0, error("\
-Error: less columns present than needed for LHS~RHS and value");
+Error: fewer columns present than needed for LHS~RHS and value");
 		rc = -1;
 		goto out;
 	} else if (UNLIKELY(!(coff = calloc(ncol + 1U, sizeof(*coff))))) {

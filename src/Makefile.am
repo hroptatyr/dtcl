@@ -25,6 +25,9 @@ noinst_HEADERS += nifty.h
 bin_PROGRAMS += dtcast
 BUILT_SOURCES += dtcast.yucc
 
+bin_PROGRAMS += dtmelt
+BUILT_SOURCES += dtmelt.yucc
+
 
 ## version rules
 version.c: version.c.in $(top_builddir)/.version

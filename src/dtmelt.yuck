@@ -1,0 +1,7 @@
+Usage: dtmelt < FILE
+
+Streaming implementation of data.table's ?melt.
+
+  -H, --header          Header is present in FILE
+  -M, --measure=COL...  Measure variable.
+  -I, --idvar=COL...    Identifying variable.
