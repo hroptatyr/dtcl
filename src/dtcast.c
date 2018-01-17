@@ -179,11 +179,11 @@ prnt:
 	}
 more:
 	/* dimension line */
-	fwrite(dim, 1, ndim, stdout);
+	fwrite(dim, sizeof(*dim), ndim, stdout);
 	for (size_t j = 0U; j < ncc; j++) {
 		fputc('\t', stdout);
 		if (nccv[j]) {
-			fwrite(ccv[j] + ccvo[j][m[j]], 1,
+			fwrite(ccv[j] + ccvo[j][m[j]], sizeof(char),
 			       ccvo[j][m[j] + 1U] - ccvo[j][m[j]], stdout);
 		}
 	}
