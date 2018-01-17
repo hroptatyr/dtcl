@@ -445,7 +445,7 @@ Error: cannot determine number of columns");
 		goto out;
 	} else if (UNLIKELY(chck(ncol) < 0)) {
 		errno = 0, error("\
-Error: less columns present than needed for LHS~RHS and value");
+Error: fewer columns present than needed for LHS~RHS and value");
 		rc = -1;
 		goto out;
 	} else if (UNLIKELY(!(coff = calloc(ncol + 1U, sizeof(*coff))))) {
