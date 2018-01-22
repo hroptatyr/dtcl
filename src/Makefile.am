@@ -28,6 +28,9 @@ BUILT_SOURCES += dtcast.yucc
 bin_PROGRAMS += dtmelt
 BUILT_SOURCES += dtmelt.yucc
 
+bin_PROGRAMS += lines
+BUILT_SOURCES += lines.yucc
+
 
 ## version rules
 version.c: version.c.in $(top_builddir)/.version
