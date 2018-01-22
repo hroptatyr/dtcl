@@ -1,0 +1,20 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ < "${srcdir}/molten_01.csv" dtcast '2+1+3~.'
+AX	2009-03-12	open
+AX	2009-03-12	high
+AX	2009-03-12	low
+AX	2009-03-12	close
+BZX	2009-03-12	open
+BZX	2009-03-12	high
+BZX	2009-03-12	low
+BZX	2009-03-12	close
+AX	2009-03-13	open
+AX	2009-03-13	high
+AX	2009-03-13	low
+AX	2009-03-13	close
+BZX	2009-03-13	open
+BZX	2009-03-13	high
+BZX	2009-03-13	low
+BZX	2009-03-13	close
+$

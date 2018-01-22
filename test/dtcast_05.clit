@@ -1,0 +1,8 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ dtcast -C open -C close < "${srcdir}/molten_01.csv" '1+2~3'
+2009-03-12	AX	717.25	718.42
+2009-03-12	BZX	715.32	718.35
+2009-03-13	AX	721.14	717.14
+2009-03-13	BZX	717.34	718.00
+$

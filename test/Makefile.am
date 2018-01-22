@@ -20,4 +20,14 @@ CLEANFILES = $(check_PROGRAMS)
 ## summon our helper
 include clitoris.am
 
+EXTRA_DIST += molten_01.csv
+EXTRA_DIST += cast_01.csv
+
+TESTS += dtcast_01.clit
+TESTS += dtcast_02.clit
+TESTS += dtcast_03.clit
+TESTS += dtcast_04.clit
+TESTS += dtcast_05.clit
+TESTS += dtcast_06.clit
+
 ## Makefile.am ends here
