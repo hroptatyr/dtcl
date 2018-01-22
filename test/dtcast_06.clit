@@ -1,6 +1,6 @@
 #!/usr/bin/clitoris  ## -*- shell-script -*-
 
-$ dtcast < "${srcdir}/molten_01.csv" '1+2~3' --col-names
+$ tail -n +2 "${srcdir}/molten_01.csv" | dtcast '1+2~3' --col-names
 V1	V2	open	high	low	close
 2009-03-12	AX	717.25	718.47	717.25	718.42
 2009-03-12	BZX	715.32	717.57	714.65	718.35
