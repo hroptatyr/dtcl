@@ -19,6 +19,8 @@ CLEANFILES = $(check_PROGRAMS)
 
 ## summon our helper
 include clitoris.am
+AM_CLIT_LOG_FLAGS = --builddir $(top_builddir)/src --verbose
+TESTS_ENVIRONMENT = LC_ALL=C
 
 EXTRA_DIST += molten_01.csv
 EXTRA_DIST += cast_01.csv
