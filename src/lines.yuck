@@ -1,0 +1,3 @@
+Usage: lines FILE... < LINES
+
+Extract LINES from FILEs.
