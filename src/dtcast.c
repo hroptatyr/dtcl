@@ -46,11 +46,13 @@
 #include "nifty.h"
 
 static int hdrp = 0;
+static int cnmp = 0;
 /* number of cast columns */
 static size_t ncc;
 static size_t zcc;
 /* cast column hash values */
 static uint64_t *cc;
+static const char **cn;
 /* number of distinct values per cast column */
 static size_t *nccv;
 /* total size of allocated ccv */
@@ -148,6 +150,7 @@ MurmurHash64A(const void *key, size_t len)
 static void
 prnt(void)
 {
+	static int cnmprntdp;
 	size_t m[ncc];
 	size_t s[ncc];
 	size_t ns = 0U;
@@ -178,6 +181,19 @@ prnt:
 		}
 	}
 more:
+	/* colnames */
+	if (cnmp && UNLIKELY(!cnmprntdp)) {
+		cnmprntdp++;
+		for (size_t j = 0U; j < nlhs; j++) {
+			fputc('V', stdout);
+			fprintf(stdout, "%zu", j + 1U);
+			fputc('\t' + (!ncc && j + 1 >= nlhs), stdout);
+		}
+		for (size_t i = 0U; i < ncc; i++) {
+			fputs(cn[i], stdout);
+			fputc('\t' + (i + 1 >= ncc), stdout);
+		}
+	}
 	/* dimension line */
 	fwrite(dim, sizeof(*dim), ndim, stdout);
 	for (size_t j = 0U; j < ncc; j++) {
@@ -262,6 +278,9 @@ bang(const char *str, size_t len, size_t j)
 static void
 mtcc(void)
 {
+	for (size_t i = ncc; i < zcc; i++) {
+		free(ccvo[i]);
+	}
 	zcc = 0U;
 	return;
 }
@@ -272,6 +291,8 @@ stcc(char *const *args, size_t nargs)
 	if (!(ncc = nargs)) {
 		;
 	} else if (UNLIKELY((cc = calloc(ncc, sizeof(*cc))) == NULL)) {
+		return -1;
+	} else if (cnmp && UNLIKELY((cn = calloc(ncc, sizeof(*cn))) == NULL)) {
 		return -1;
 	} else if (UNLIKELY((nccv = calloc(ncc, sizeof(*nccv))) == NULL)) {
 		return -1;
@@ -292,11 +313,18 @@ stcc(char *const *args, size_t nargs)
 		const char *c = args[i];
 		cc[i] = hash(c, strlen(c));
 	}
+	if (!cnmp) {
+		return 0;
+	}
+	/* otherwise also store column names */
+	for (size_t i = 0U; i < ncc; i++) {
+		cn[i] = args[i];
+	}
 	return 0;
 }
 
 static int
-adcc(uint64_t c)
+adcc(uint64_t c, const char *n, size_t z)
 {
 	if (UNLIKELY(ncc >= zcc)) {
 		const size_t nuz = (zcc * 2U) ?: 64U;
@@ -307,6 +335,9 @@ adcc(uint64_t c)
 		ccvo = realloc(ccvo, nuz * sizeof(*ccvo));
 		zccv = realloc(zccv, nuz * sizeof(*zccv));
 		zccvo = realloc(zccvo, nuz * sizeof(*zccvo));
+		if (cnmp) {
+			cn = realloc(cn, nuz * sizeof(*cn));
+		}
 
 		if (UNLIKELY(cc == NULL)) {
 			return -1;
@@ -320,7 +351,13 @@ adcc(uint64_t c)
 			return -1;
 		} else if (UNLIKELY(zccvo == NULL)) {
 			return -1;
+		} else if (cnmp && UNLIKELY(cn == NULL)) {
+			return -1;
 		}
+		memset(cc + zcc, 0, (nuz - zcc) * sizeof(*cc));
+		memset(nccv + zcc, 0, (nuz - zcc) * sizeof(*nccv));
+		memset(ccv + zcc, 0, (nuz - zcc) * sizeof(*ccv));
+		memset(zccv + zcc, 0, (nuz - zcc) * sizeof(*zccv));
 		for (size_t j = zcc; j < nuz; j++) {
 			ccvo[j] = calloc(8U, sizeof(*ccvo[j]));
 			zccvo[j] = 8U;
@@ -330,6 +367,11 @@ adcc(uint64_t c)
 	}
 	/* really add him now */
 	cc[ncc++] = c;
+	if (!cnmp) {
+		return 0;
+	}
+	/* otherwise also remember his name */
+	cn[ncc - 1] = strndup(n, z);
 	return 0;
 }
 
@@ -509,7 +551,9 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 
 			if (UNLIKELY(zcc || !ncc)) {
 				/* add him */
-				if (UNLIKELY(adcc(c) < 0)) {
+				const char *n = line + of;
+				size_t z = eo - of - 1;
+				if (UNLIKELY(adcc(c, n, z) < 0)) {
 					break;
 				}
 			} else {
@@ -626,6 +670,8 @@ Error: invalide value column");
 		}
 	}
 
+	/* memorise that we want col names for STCC() later on */
+	cnmp = argi->col_names_flag;
 	if (!(rhs + 1U)) {
 		/* don't set up cast columns regardless what they specified */
 		;
@@ -652,6 +698,12 @@ Error: cannot set up cast columns");
 	}
 	free(ccvo);
 	free(dim);
+	if (!argi->cast_nargs && cn) {
+		for (size_t i = 0U; i < ncc; i++) {
+			free(deconst(cn[i]));
+		}
+	}
+	free(cn);
 
 	if (nlhs) {
 		free(lhs.p);
