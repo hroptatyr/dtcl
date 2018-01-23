@@ -150,7 +150,6 @@ MurmurHash64A(const void *key, size_t len)
 static void
 prnt(void)
 {
-	static int cnmprntdp;
 	size_t m[ncc];
 	size_t s[ncc];
 	size_t ns = 0U;
@@ -181,19 +180,6 @@ prnt:
 		}
 	}
 more:
-	/* colnames */
-	if (cnmp && UNLIKELY(!cnmprntdp)) {
-		cnmprntdp++;
-		for (size_t j = 0U; j < nlhs; j++) {
-			fputc('V', stdout);
-			fprintf(stdout, "%zu", j + 1U);
-			fputc('\t' + (!ncc && j + 1 >= nlhs), stdout);
-		}
-		for (size_t i = 0U; i < ncc; i++) {
-			fputs(cn[i], stdout);
-			fputc('\t' + (i + 1 >= ncc), stdout);
-		}
-	}
 	/* dimension line */
 	fwrite(dim, sizeof(*dim), ndim, stdout);
 	for (size_t j = 0U; j < ncc; j++) {
@@ -214,6 +200,48 @@ more:
 		}
 	}
 	fputc('\n', stdout);
+	return;
+}
+
+static void
+phdr(const char *hdrs, const size_t *hoff)
+{
+	if (hdrs == NULL) {
+		size_t i;
+		size_t j = 0U;
+
+		if (!nlhs) {
+			i = lhs.v;
+			goto one;
+		}
+		while (j < nlhs) {
+			i = lhs.p[j];
+		one:
+			fputc('V', stdout);
+			fprintf(stdout, "%zu", i + 1U);
+			fputc('\t' + (++j >= nlhs && !ncc), stdout);
+		}
+	} else {
+		size_t i;
+		size_t j = 0U;
+
+		if (!nlhs) {
+			i = lhs.v;
+			goto onh;
+		}
+		while (j < nlhs) {
+			i = lhs.p[j];
+		onh:;
+			const size_t of = hoff[i + 0U];
+			const size_t eo = hoff[i + 1U];
+			fwrite(hdrs + of, sizeof(*hdrs), eo - of - 1U, stdout);
+			fputc('\t' + (++j >= nlhs && !ncc), stdout);
+		}
+	}
+	for (size_t i = 0U; i < ncc; i++) {
+		fputs(cn[i], stdout);
+		fputc('\t' + (i + 1 >= ncc), stdout);
+	}
 	return;
 }
 
@@ -458,6 +486,23 @@ tokln1(size_t *restrict c, size_t nc, const char *ln, size_t lz)
 	return j;
 }
 
+static uint64_t
+hashln(const char *ln, size_t *of)
+{
+	uint64_t d = 0U;
+
+	if (!nlhs) {
+		const size_t bo = of[lhs.v + 0U];
+		const size_t eo = of[lhs.v + 1U];
+		d = hash(ln + bo, eo - bo - 1U);
+	} else for (size_t i = 0U; i < nlhs; i++) {
+		const size_t bo = of[lhs.p[i] + 0U];
+		const size_t eo = of[lhs.p[i] + 1U];
+		d ^= hash(ln + bo, eo - bo - 1U);
+	}
+	return d;
+}
+
 static int
 proc1(void)
 {
@@ -467,6 +512,9 @@ proc1(void)
 	ssize_t nrd;
 	size_t ncol;
 	size_t *coff;
+	/* offsets for header and header buffer */
+	char *hn = NULL;
+	size_t *hoff = NULL;
 	/* line number */
 	size_t nr = 0U;
 	/* last dimension hash */
@@ -497,8 +545,88 @@ Error: cannot allocate memory to hold one line");
 		goto out;
 	}
 
-	if (!hdrp) {
+	if (!hdrp && ncc) {
+		/* go straight to tok loop */
 		goto tok;
+	} else if (!hdrp) {
+		/* implies !ncc, we need to snarf cast cols then */
+		goto scctok;
+	}
+	/* otherwise snarf col names as defined in header */
+	if (UNLIKELY((hn = strndup(line, nrd)) == NULL ||
+		     (hoff = calloc(ncol + 1U, sizeof(*hoff))) == NULL)) {
+		error("\
+Error: cannot allocate memory to hold a copy of the header");
+		rc = -1;
+		goto err;
+	}
+	tokln1(hoff, ncol, line, nrd);
+	for (size_t i = 1U; i <= ncol; i++) {
+		hn[hoff[i] - 1U] = '\0';
+	}
+
+	/* depending on whether cast cols are specified explicitly */
+	if (ncc) {
+		/* yea we know what we want */
+		goto tok;
+	}
+
+	/* snarf first complete group to obtain cast columns */
+	while ((nrd = getline(&line, &llen, stdin)) > 0) {
+	scctok:
+		nr++;
+		size_t nf = tokln1(coff, ncol, line, nrd);
+
+		if (UNLIKELY(nf < ncol)) {
+			errno = 0, error("\
+Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
+			rc = 2;
+			break;
+		}
+
+		/* hash dimension columns */
+		with (const uint64_t d = hashln(line, coff)) {
+			if (UNLIKELY(!last_d)) {
+				rset(line, coff);
+			} else if (UNLIKELY(d != last_d)) {
+				/* materialise cast cols */
+				mtcc();
+				/* pretend we didn't see this line */
+				nr--;
+				/* and continue with main tokenisation loop */
+				goto tok;
+			}
+			last_d = d;
+		}
+
+		/* store value */
+		if (rhs < ncol) {
+			size_t of = coff[rhs + 0U];
+			size_t eo = coff[rhs + 1U];
+			const uint64_t c = hash(line + of, eo - of - 1);
+			size_t j;
+
+			for (j = 0U; j < ncc; j++) {
+				if (cc[j] == c) {
+					/* found him */
+					break;
+				}
+			}
+
+			if (j >= ncc) {
+				/* add him */
+				const char *n = line + of;
+				size_t z = eo - of - 1;
+				if (UNLIKELY(adcc(c, n, z) < 0)) {
+					break;
+				}
+			}
+
+			/* bang */
+			of = coff[vhs - 1U];
+			eo = coff[vhs];
+			bang(line + of, eo - of - 1U, j);
+		}
 	}
 
 	while ((nrd = getline(&line, &llen, stdin)) > 0) {
@@ -514,25 +642,20 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 		}
 
 		/* hash dimension columns */
-		with (uint64_t d = 0U) {
-			if (!nlhs) {
-				const size_t of = coff[lhs.v + 0U];
-				const size_t eo = coff[lhs.v + 1U];
-				d = hash(line + of, eo - of - 1U);
-			} else for (size_t i = 0U; i < nlhs; i++) {
-				const size_t of = coff[lhs.p[i] + 0U];
-				const size_t eo = coff[lhs.p[i] + 1U];
-				d ^= hash(line + of, eo - of - 1U);
-			}
-			if (UNLIKELY(d != last_d)) {
+		with (const uint64_t d = hashln(line, coff)) {
+			if (UNLIKELY(!last_d)) {
+				rset(line, coff);
+			} else if (UNLIKELY(d != last_d)) {
+				static int cprp;
+				if (UNLIKELY(!cprp && cnmp)) {
+					/* print col names */
+					phdr(hn, hoff);
+				}
+				cprp = 1;
 				prnt();
 				rset(line, coff);
-				last_d = d;
-				/* materialise cast cols */
-				if (UNLIKELY(zcc)) {
-					mtcc();
-				}
 			}
+			last_d = d;
 		}
 
 		/* store value */
@@ -548,18 +671,9 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 					goto bang;
 				}
 			}
+			/* column we didn't want */
+			continue;
 
-			if (UNLIKELY(zcc || !ncc)) {
-				/* add him */
-				const char *n = line + of;
-				size_t z = eo - of - 1;
-				if (UNLIKELY(adcc(c, n, z) < 0)) {
-					break;
-				}
-			} else {
-				/* column we didn't want */
-				continue;
-			}
 		bang:
 			/* bang */
 			of = coff[vhs - 1U];
@@ -570,7 +684,9 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 	/* print the last one */
 	prnt();
 
+err:
 	free(coff);
+	free(hoff);
 out:
 	free(line);
 	return rc;
@@ -670,6 +786,8 @@ Error: invalide value column");
 		}
 	}
 
+	/* overread and/or expect headers? */
+	hdrp = argi->header_flag;
 	/* memorise that we want col names for STCC() later on */
 	cnmp = argi->col_names_flag;
 	if (!(rhs + 1U)) {
