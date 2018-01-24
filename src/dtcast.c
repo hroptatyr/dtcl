@@ -526,7 +526,7 @@ hashln(const char *ln, size_t *of)
 }
 
 static ssize_t
-find_s(const char *ss, const size_t *of, size_t nc, const char *s, size_t z)
+find(const char *ss, const size_t *of, size_t nc, const char *s, size_t z)
 {
 /* find S of size Z in {SS + OF} */
 	for (size_t i = 0U; i < nc; i++) {
@@ -535,19 +535,6 @@ find_s(const char *ss, const size_t *of, size_t nc, const char *s, size_t z)
 		if (z == eo - bo - 1U &&
 		    !memcmp(ss + bo, s, z)) {
 			return i;
-		}
-	}
-	/* not found */
-	return -1;
-}
-
-static ssize_t
-find_i(const size_t *is, size_t ni, size_t i)
-{
-/* find I in IS of size NI */
-	for (size_t j = 0U; j < ni; j++) {
-		if (is[j] == i) {
-			return j;
 		}
 	}
 	/* not found */
@@ -586,7 +573,7 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 	if (!nl) {
 		goto one_l;
 	}
-	for (nl = 0U; l < elhs; l = on + 1U) {
+	for (nl = 0U; nl < nlhs; nl++, l = on + 1U) {
 		/* try with numbers first */
 		char *tmp;
 		long unsigned int x;
@@ -595,7 +582,7 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 		on = memchrnul(l, '+', elhs - l);
 		if ((x = strtoul(l, &tmp, 10)) && tmp == on) {
 			x--;
-		} else if ((x = find_s(hn, of, nc, l, on - l)) < nc) {
+		} else if ((x = find(hn, of, nc, l, on - l)) < nc) {
 			;
 		} else {
 			return -1;
@@ -603,11 +590,8 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 
 		if (!nlhs) {
 			lhs.v = x;
-		} else if (find_i(lhs.p, nl, x) >= 0) {
-			/* we got him already*/
-			nlhs--;
 		} else {
-			lhs.p[nl++] = x;
+			lhs.p[nl] = x;
 		}
 	}
 
@@ -615,7 +599,7 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 	if (!nr) {
 		goto one_r;
 	}
-	for (nr = 0U; r < erhs; r = on + 1U) {
+	for (nr = 0U; nr < nrhs; nr++, r = on + 1U) {
 		/* try with numbers first */
 		char *tmp;
 		long unsigned int x;
@@ -625,7 +609,7 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 		if ((x = strtoul(r, &tmp, 10)) && tmp == on ||
 		    *tmp == '.' && tmp + 1 == on && !nrhs) {
 			x--;
-		} else if ((x = find_s(hn, of, nc, r, on - r)) < nc) {
+		} else if ((x = find(hn, of, nc, r, on - r)) < nc) {
 			;
 		} else {
 			return -1;
@@ -633,11 +617,8 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 
 		if (!nrhs) {
 			rhs.v = x;
-		} else if (find_i(rhs.p, nr, x) >= 0) {
-			/* we got him already*/
-			nrhs--;
 		} else {
-			rhs.p[nr++] = x;
+			rhs.p[nr] = x;
 		}
 	}
 	/* all is good, forget about the formula then */
