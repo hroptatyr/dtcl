@@ -362,8 +362,8 @@ stcc(char *const *args, size_t nargs)
 	return 0;
 }
 
-static int
-adcc(uint64_t c, const char *n, size_t z)
+static ssize_t
+adcc(const char *ln, const size_t *of, uint64_t c)
 {
 	if (UNLIKELY(ncc >= zcc)) {
 		const size_t nuz = (zcc * 2U) ?: 64U;
@@ -405,13 +405,37 @@ adcc(uint64_t c, const char *n, size_t z)
 		zcc = nuz;
 	}
 	/* really add him now */
-	cc[ncc++] = c;
-	if (!cnmp) {
-		return 0;
+	cc[ncc] = c;
+	if (cnmp) {
+		/* otherwise also remember his name */
+		size_t z = 0U;
+		char *n = NULL;
+
+		if (!nrhs) {
+			const size_t bo = of[rhs.v + 0U];
+			const size_t eo = of[rhs.v + 1U];
+			n = strndup(ln + bo, eo - bo - 1);
+		} else for (size_t j = 0U, o = 0U; j < nrhs; j++, o++) {
+			const size_t bo = of[rhs.p[j] + 0U];
+			const size_t eo = of[rhs.p[j] + 1U];
+
+			if (UNLIKELY(o + eo - bo - 1 >= z)) {
+				/* resize */
+				while (o + eo - bo - 1 >= z) {
+					z = (z * 2U) ?: 64U;
+				}
+				n = realloc(n, z);
+				if (UNLIKELY(n == NULL)) {
+					return -1;
+				}
+			}
+			memcpy(n + o, ln + bo, eo - bo - 1);
+			o += eo - bo - 1;
+			n[o] = (char)(j + 1U < nrhs ? '*' : '\0');
+		}
+		cn[ncc] = n;
 	}
-	/* otherwise also remember his name */
-	cn[ncc - 1] = strndup(n, z);
-	return 0;
+	return ncc++;
 }
 
 
@@ -526,8 +550,25 @@ hashln(const char *ln, size_t *of)
 	return d;
 }
 
+static uint64_t
+hashrn(const char *ln, size_t *of)
+{
+	uint64_t d = 0U;
+
+	if (!nrhs) {
+		const size_t bo = of[rhs.v + 0U];
+		const size_t eo = of[rhs.v + 1U];
+		d = hash(ln + bo, eo - bo - 1);
+	} else for (size_t i = 0U; i < nrhs; i++) {
+		const size_t bo = of[rhs.p[i] + 0U];
+		const size_t eo = of[rhs.p[i] + 1U];
+		d ^= hash2(ln + bo, eo - bo - 1U, i);
+	}
+	return d;
+}
+
 static ssize_t
-find(const char *ss, const size_t *of, size_t nc, const char *s, size_t z)
+find_s(const char *ss, const size_t *of, size_t nc, const char *s, size_t z)
 {
 /* find S of size Z in {SS + OF} */
 	for (size_t i = 0U; i < nc; i++) {
@@ -536,6 +577,19 @@ find(const char *ss, const size_t *of, size_t nc, const char *s, size_t z)
 		if (z == eo - bo - 1U &&
 		    !memcmp(ss + bo, s, z)) {
 			return i;
+		}
+	}
+	/* not found */
+	return -1;
+}
+
+static ssize_t
+find_c(const uint64_t c)
+{
+	for (size_t j = 0U; j < ncc; j++) {
+		if (cc[j] == c) {
+			/* found him */
+			return j;
 		}
 	}
 	/* not found */
@@ -583,7 +637,7 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 		on = memchrnul(l, '+', elhs - l);
 		if ((x = strtoul(l, &tmp, 10)) && tmp == on) {
 			x--;
-		} else if ((x = find(hn, of, nc, l, on - l)) < nc) {
+		} else if ((x = find_s(hn, of, nc, l, on - l)) < nc) {
 			;
 		} else {
 			return -1;
@@ -610,7 +664,7 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 		if ((x = strtoul(r, &tmp, 10)) && tmp == on ||
 		    *tmp == '.' && tmp + 1 == on && !nrhs) {
 			x--;
-		} else if ((x = find(hn, of, nc, r, on - r)) < nc) {
+		} else if ((x = find_s(hn, of, nc, r, on - r)) < nc) {
 			;
 		} else {
 			return -1;
@@ -735,33 +789,26 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 			last_d = d;
 		}
 
-		/* store value */
-		if (rhs.v < ncol) {
-			size_t of = coff[rhs.v + 0U];
-			size_t eo = coff[rhs.v + 1U];
-			const uint64_t c = hash(line + of, eo - of - 1);
-			size_t j;
+		/* store value? */
+		if (!nrhs && !(rhs.v + 1U)) {
+			/* nope */
+			continue;
+		}
+		/* store value! */
+		with (const uint64_t c = hashrn(line, coff)) {
+			ssize_t j;
 
-			for (j = 0U; j < ncc; j++) {
-				if (cc[j] == c) {
-					/* found him */
-					break;
-				}
+			if ((j = find_c(c)) >= 0) {
+				/* all good */
+				;
+			} else if (UNLIKELY((j = adcc(line, coff, c)) < 0)) {
+				/* big bugger */
+				goto err;
 			}
-
-			if (j >= ncc) {
-				/* add him */
-				const char *n = line + of;
-				size_t z = eo - of - 1;
-				if (UNLIKELY(adcc(c, n, z) < 0)) {
-					break;
-				}
-			}
-
 			/* bang */
-			of = coff[vhs - 1U];
-			eo = coff[vhs];
-			bang(line + of, eo - of - 1U, j);
+			with (size_t of = coff[vhs - 1U], eo = coff[vhs]) {
+				bang(line + of, eo - of - 1U, j);
+			}
 		}
 	}
 
@@ -794,27 +841,23 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 			last_d = d;
 		}
 
-		/* store value */
-		if (rhs.v < ncol) {
-			size_t of = coff[rhs.v + 0U];
-			size_t eo = coff[rhs.v + 1U];
-			const uint64_t c = hash(line + of, eo - of - 1);
-			size_t j;
-
-			for (j = 0U; j < ncc; j++) {
-				if (cc[j] == c) {
-					/* found him */
-					goto bang;
-				}
-			}
-			/* column we didn't want */
+		/* store value? */
+		if (!nrhs && !(rhs.v + 1U)) {
+			/* nope */
 			continue;
+		}
+		/* store value! */
+		with (const uint64_t c = hashrn(line, coff)) {
+			ssize_t j;
 
-		bang:
+			if ((j = find_c(c)) < 0) {
+				/* don't want him */
+				break;
+			}
 			/* bang */
-			of = coff[vhs - 1U];
-			eo = coff[vhs];
-			bang(line + of, eo - of - 1U, j);
+			with (size_t of = coff[vhs - 1U], eo = coff[vhs]) {
+				bang(line + of, eo - of - 1U, j);
+			}
 		}
 	}
 	/* print the last one */
