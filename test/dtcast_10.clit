@@ -1,0 +1,4 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ ! tail -n +2 "${srcdir}/molten_01.csv" | dtcast 'date+sym~type'
+$

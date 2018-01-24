@@ -31,5 +31,9 @@ TESTS += dtcast_03.clit
 TESTS += dtcast_04.clit
 TESTS += dtcast_05.clit
 TESTS += dtcast_06.clit
+TESTS += dtcast_07.clit
+TESTS += dtcast_08.clit
+TESTS += dtcast_09.clit
+TESTS += dtcast_10.clit
 
 ## Makefile.am ends here
