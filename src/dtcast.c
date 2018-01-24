@@ -74,8 +74,12 @@ static size_t nlhs;
 static union {
 	size_t v;
 	size_t *p;
-} lhs = {0U};
-static size_t rhs = 1U;
+} lhs;
+static size_t nrhs;
+static union {
+	size_t v;
+	size_t *p;
+} rhs;
 /* this one is 1-based */
 static size_t vhs;
 
@@ -95,6 +99,12 @@ error(const char *fmt, ...)
 	}
 	fputc('\n', stderr);
 	return;
+}
+
+static inline const char*
+memchrnul(const char *s, int c, size_t z)
+{
+	return memchr(s, c, z) ?: s + z;
 }
 
 /* murmur2 */
@@ -158,7 +168,7 @@ prnt(void)
 		/* no dimensions? */
 		return;
 	}
-	if (!(rhs + 1U)) {
+	if (!(rhs.v + 1U)) {
 		/* just the dimension */
 		goto more;
 	}
@@ -420,8 +430,14 @@ mvhs(size_t ncol)
 				goto next;
 			}
 		}
-		if (rhs == v) {
-			goto next;
+		if (!nrhs) {
+			if (rhs.v == v) {
+				goto next;
+			}
+		} else for (size_t i = 0U; i < nrhs; i++) {
+			if (rhs.p[i] == v) {
+				goto next;
+			}
 		}
 		return v + 1U;
 	next:
@@ -442,8 +458,14 @@ chck(size_t ncol)
 			return -1;
 		}
 	}
-	if (UNLIKELY(rhs >= ncol && rhs + 1U)) {
-		return -1;
+	if (!nrhs) {
+		if (UNLIKELY(rhs.v >= ncol && rhs.v + 1U)) {
+			return -1;
+		}
+	} else for (size_t i = 0U; i < nrhs; i++) {
+		if (UNLIKELY(rhs.p[i] >= ncol)) {
+			return -1;
+		}
 	}
 	if (vhs && vhs > ncol) {
 		return -1;
@@ -501,6 +523,107 @@ hashln(const char *ln, size_t *of)
 		d ^= hash(ln + bo, eo - bo - 1U);
 	}
 	return d;
+}
+
+static ssize_t
+find(const char *ss, const size_t *of, size_t nc, const char *s, size_t z)
+{
+/* find S of size Z in {SS + OF} */
+	for (size_t i = 0U; i < nc; i++) {
+		const size_t bo = of[i + 0U];
+		const size_t eo = of[i + 1U];
+		if (z == eo - bo - 1U &&
+		    !memcmp(ss + bo, s, z)) {
+			return i;
+		}
+	}
+	/* not found */
+	return -1;
+}
+
+static int
+snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
+{
+	static const char *form;
+	const char *elhs, *l;
+	const char *erhs, *r;
+	const char *on;
+	size_t nl, nr;
+
+	if (UNLIKELY((formula = form ?: formula) == NULL)) {
+		return !form - 1;
+	}
+	if ((elhs = strchr(l = form = formula, '~')) == NULL) {
+		return -1;
+	}
+	r = elhs + 1U;
+	erhs = r + strlen(r);
+
+	for (nl = 0U, on = l; (on = memchr(on, '+', elhs - on)); nl++, on++);
+	for (nr = 0U, on = r; (on = memchr(on, '+', erhs - on)); nr++, on++);
+
+	if (nl && !lhs.p) {
+		lhs.p = calloc(nlhs = nl + 1U, sizeof(*lhs.p));
+	}
+	if (nr && !rhs.p) {
+		rhs.p = calloc(nrhs = nr + 1U, sizeof(*rhs.p));
+	}
+
+	/* now try and snarf the whole shebang */
+	if (!nl) {
+		goto one_l;
+	}
+	for (nl = 0U; nl < nlhs; nl++, l = on + 1U) {
+		/* try with numbers first */
+		char *tmp;
+		long unsigned int x;
+
+	one_l:
+		on = memchrnul(l, '+', elhs - l);
+		if ((x = strtoul(l, &tmp, 10)) && tmp == on) {
+			x--;
+		} else if ((x = find(hn, of, nc, l, on - l)) < nc) {
+			;
+		} else {
+			return -1;
+		}
+
+		if (!nlhs) {
+			lhs.v = x;
+		} else {
+			lhs.p[nl] = x;
+		}
+	}
+
+	/* snarf right hand side */
+	if (!nr) {
+		goto one_r;
+	}
+	for (nr = 0U; nr < nrhs; nr++, r = on + 1U) {
+		/* try with numbers first */
+		char *tmp;
+		long unsigned int x;
+
+	one_r:
+		on = memchrnul(r, '+', erhs - r);
+		if ((x = strtoul(r, &tmp, 10)) && tmp == on ||
+		    *tmp == '.' && tmp + 1 == on) {
+			x--;
+		} else if ((x = find(hn, of, nc, r, on - r)) < nc) {
+			;
+		} else {
+			return -1;
+		}
+
+		if (!nrhs) {
+			rhs.v = x;
+		} else {
+			rhs.p[nr] = x;
+		}
+	}
+	/* all is good, forget about the formula then */
+	form = NULL;
+	return 0;
 }
 
 static int
@@ -564,6 +687,18 @@ Error: cannot allocate memory to hold a copy of the header");
 	for (size_t i = 1U; i <= ncol; i++) {
 		hn[hoff[i] - 1U] = '\0';
 	}
+	/* we might need to rescan the formula now */
+	if (UNLIKELY(snrf(NULL, hn, hoff, ncol)) < 0) {
+		error("\
+Error: cannot interpret formula");
+		rc = -1;
+		goto err;
+	} else if (UNLIKELY(chck(ncol) < 0)) {
+		errno = 0, error("\
+Error: fewer columns present than needed for LHS~RHS and value");
+		rc = -1;
+		goto err;
+	}
 
 	/* depending on whether cast cols are specified explicitly */
 	if (ncc) {
@@ -600,9 +735,9 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 		}
 
 		/* store value */
-		if (rhs < ncol) {
-			size_t of = coff[rhs + 0U];
-			size_t eo = coff[rhs + 1U];
+		if (rhs.v < ncol) {
+			size_t of = coff[rhs.v + 0U];
+			size_t eo = coff[rhs.v + 1U];
 			const uint64_t c = hash(line + of, eo - of - 1);
 			size_t j;
 
@@ -659,9 +794,9 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 		}
 
 		/* store value */
-		if (rhs < ncol) {
-			size_t of = coff[rhs + 0U];
-			size_t eo = coff[rhs + 1U];
+		if (rhs.v < ncol) {
+			size_t of = coff[rhs.v + 0U];
+			size_t eo = coff[rhs.v + 1U];
 			const uint64_t c = hash(line + of, eo - of - 1);
 			size_t j;
 
@@ -692,68 +827,6 @@ out:
 	return rc;
 }
 
-static int
-snrf(char *formula)
-{
-	size_t zlhs = 0U;
-	long unsigned int x;
-	char *on = formula;
-
-redo:
-	x = strtoul(on, &on, 10);
-	/* skip white space */
-	for (; (unsigned char)(*on - 1) < ' '; on++);
-	switch (*on++) {
-	case '+':
-		/* more to come */
-		if (UNLIKELY(nlhs >= zlhs)) {
-			zlhs = (zlhs * 2U) ?: 8U;
-			lhs.p = calloc(zlhs, sizeof(*lhs.p));
-		}
-		lhs.p[nlhs++] = x - (x > 0U);
-		goto redo;
-	case '~':
-		/* rhs coming */
-		if (!nlhs) {
-			lhs.v = x - (x > 0U);
-		} else {
-			if (UNLIKELY(nlhs >= zlhs)) {
-				zlhs = (zlhs * 2U) ?: 8U;
-				lhs.p = calloc(zlhs, sizeof(*lhs.p));
-			}
-			lhs.p[nlhs++] = x - (x > 0U);
-		}
-		goto rhs;
-	default:
-		return -1;
-	}
-rhs:
-	if (UNLIKELY(!(rhs = strtoul(on, &on, 10)))) {
-		/* skip white space */
-		for (; (unsigned char)(*on - 1) < ' '; on++);
-		if (*on == '.') {
-			/* bla ~ . */
-			rhs--;
-			return 0;
-		}
-		return -1;
-	} else if (UNLIKELY(*on)) {
-		return -1;
-	}
-	/* we're 0-based internally */
-	rhs--;
-
-	/* check that LHS and RHS are disjoint */
-	if (!nlhs && UNLIKELY(lhs.v == rhs)) {
-		return -1;
-	} else for (size_t i = 0U; i < nlhs; i++) {
-		if (UNLIKELY(lhs.p[i] == rhs)) {
-			return -1;
-		}
-	}
-	return 0;
-}
-
 
 #include "dtcast.yucc"
 
@@ -764,14 +837,6 @@ main(int argc, char *argv[])
 	int rc = 0;
 
 	if (yuck_parse(argi, argc, argv) < 0) {
-		rc = 1;
-		goto out;
-	}
-
-	/* snarf formula */
-	if (UNLIKELY(!argi->nargs || snrf(*argi->args) < 0)) {
-		error("\
-Error: cannot interpret formula");
 		rc = 1;
 		goto out;
 	}
@@ -790,7 +855,17 @@ Error: invalide value column");
 	hdrp = argi->header_flag;
 	/* memorise that we want col names for STCC() later on */
 	cnmp = argi->col_names_flag;
-	if (!(rhs + 1U)) {
+
+	/* snarf formula */
+	if (UNLIKELY(!argi->nargs ||
+		     snrf(*argi->args, NULL, NULL, 0U) < 0 && !hdrp)) {
+		error("\
+Error: cannot interpret formula");
+		rc = 1;
+		goto out;
+	}
+
+	if (!(rhs.v + 1U)) {
 		/* don't set up cast columns regardless what they specified */
 		;
 	} else if (UNLIKELY(stcc(argi->cast_args, argi->cast_nargs) < 0)) {
@@ -825,6 +900,9 @@ Error: cannot set up cast columns");
 
 	if (nlhs) {
 		free(lhs.p);
+	}
+	if (nrhs) {
+		free(rhs.p);
 	}
 
 out:
