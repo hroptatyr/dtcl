@@ -607,7 +607,7 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 	one_r:
 		on = memchrnul(r, '+', erhs - r);
 		if ((x = strtoul(r, &tmp, 10)) && tmp == on ||
-		    *tmp == '.' && tmp + 1 == on) {
+		    *tmp == '.' && tmp + 1 == on && !nrhs) {
 			x--;
 		} else if ((x = find(hn, of, nc, r, on - r)) < nc) {
 			;
