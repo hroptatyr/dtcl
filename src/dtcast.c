@@ -111,12 +111,12 @@ memchrnul(const char *s, int c, size_t z)
 #define HASHSIZE	(64U / 8U)
 
 static uint64_t
-MurmurHash64A(const void *key, size_t len)
+MurmurHash64A(const void *key, size_t len, uint64_t seed)
 {
 	const uint64_t m = 0xc6a4a7935bd1e995ULL;
 	const int r = 47;
 
-	uint64_t h = (len * m);
+	uint64_t h = seed ^ (len * m);
 
 	const uint64_t * data = (const uint64_t *)key;
 	const uint64_t * end = data + (len/8);
@@ -153,7 +153,8 @@ MurmurHash64A(const void *key, size_t len)
 	return h;
 } 
 
-#define hash(x, y)	MurmurHash64A((x), (y))
+#define hash(x, y)	MurmurHash64A((x), (y), 0UL)
+#define hash2(x, y, z)	MurmurHash64A((x), (y), (z))
 
 
 /* ccv operations */
@@ -520,7 +521,7 @@ hashln(const char *ln, size_t *of)
 	} else for (size_t i = 0U; i < nlhs; i++) {
 		const size_t bo = of[lhs.p[i] + 0U];
 		const size_t eo = of[lhs.p[i] + 1U];
-		d ^= hash(ln + bo, eo - bo - 1U);
+		d ^= hash2(ln + bo, eo - bo - 1U, i);
 	}
 	return d;
 }
