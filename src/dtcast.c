@@ -757,7 +757,8 @@ Error: fewer columns present than needed for LHS~RHS and value");
 
 	/* depending on whether cast cols are specified explicitly */
 	if (ncc) {
-		/* yea we know what we want */
+		/* yea we know what we want, invalidate current line */
+		nrd = getline(&line, &llen, stdin);
 		goto tok;
 	}
 
