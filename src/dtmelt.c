@@ -137,6 +137,46 @@ chck(size_t ncol)
 	return 0;
 }
 
+static void
+phdr(const char *hdrs, const size_t *hoff)
+{
+	size_t i;
+
+	if (!nlhs) {
+		i = lhs.v;
+		goto onh;
+	}
+	for (size_t j = 0U; j < nlhs; j++) {
+		i = lhs.p[j];
+	onh:;
+		const size_t of = hoff[i + 0U];
+		const size_t eo = hoff[i + 1U];
+		fwrite(hdrs + of, sizeof(*hdrs), eo - of - 1U, stdout);
+		fputc('\t', stdout);
+	}
+	fputs("variable\tvalue\n", stdout);
+	return;
+}
+
+static char*
+mkhdrs(size_t *restrict of, size_t nc)
+{
+	size_t z = 64U;
+	char *r = malloc(z * sizeof(*r));
+	for (size_t i = 0U, n = 0U; i < nc; i++, n++) {
+		int m = snprintf(r + n, z - n, "V%zu", i + 1U);
+		if (n + m >= z) {
+			z *= 2U;
+			r = realloc(r, z * sizeof(*r));
+			/* reprint */
+			snprintf(r + n, z - n, "V%zu", i + 1U);
+		}
+		of[i + 0U] = n;
+		of[i + 1U] = (n += m) + 1U;
+	}
+	return r;
+}
+
 
 static size_t
 toklng(const char *ln, size_t lz)
@@ -279,7 +319,7 @@ proc1(void)
 	size_t llen = 0U;
 	ssize_t nrd;
 	size_t ncol;
-	size_t *coff;
+	size_t *coff = NULL;
 	/* line number */
 	size_t nr = 0U;
 	/* offsets for header and header buffer */
@@ -313,18 +353,32 @@ Error: fewer columns present than needed for id or measure vars");
 Error: cannot allocate memory to hold one line");
 		rc = -1;
 		goto out;
-	}
-
-	if (!hdrp) {
-		goto tok;
-	}
-	/* otherwise snarf col names as defined in header */
-	if (UNLIKELY((hn = strndup(line, nrd)) == NULL ||
-		     (hoff = calloc(ncol + 1U, sizeof(*hoff))) == NULL)) {
+	} else if (UNLIKELY(!(hoff = calloc(ncol + 1U, sizeof(*hoff))))) {
 		error("\
 Error: cannot allocate memory to hold a copy of the header");
 		rc = -1;
-		goto err;
+		goto out;
+	}
+
+	if (!hdrp) {
+		if (UNLIKELY((hn = mkhdrs(hoff, ncol)) == NULL)) {
+		error("\
+Error: cannot allocate memory to hold a copy of the header");
+		rc = -1;
+		goto out;
+		}
+		if (cnmp) {
+			/* print col names */
+			phdr(hn, hoff);
+		}
+		goto tok;
+	}
+	/* otherwise snarf col names as defined in header */
+	if (UNLIKELY((hn = strndup(line, nrd)) == NULL)) {
+		error("\
+Error: cannot allocate memory to hold a copy of the header");
+		rc = -1;
+		goto out;
 	}
 	tokln1(hoff, ncol, line, nrd);
 	for (size_t i = 1U; i <= ncol; i++) {
@@ -335,12 +389,17 @@ Error: cannot allocate memory to hold a copy of the header");
 		error("\
 Error: cannot interpret formula");
 		rc = -1;
-		goto err;
+		goto out;
 	} else if (UNLIKELY(chck(ncol) < 0)) {
 		errno = 0, error("\
 Error: fewer columns present than needed for LHS~RHS and value");
 		rc = -1;
-		goto err;
+		goto out;
+	}
+	if (cnmp && (nrd = getline(&line, &llen, stdin)) > 0) {
+		/* print col names */
+		phdr(hn, hoff);
+		goto tok;
 	}
 
 	while ((nrd = getline(&line, &llen, stdin)) > 0) {
@@ -389,16 +448,19 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 		one_r:
 			fwrite(dln, sizeof(*dln), ndln, stdout);
 			/* header or index */
-			fprintf(stdout, "V%zu", v + 1U);
+			with (size_t hb = hoff[v + 0U], he = hoff[v + 1U]) {
+				fwrite(hn + hb, 1, he - hb - 1, stdout);
+			}
 			fputc('\t', stdout);
 			fwrite(line + bo, sizeof(*line), eo - bo - 1, stdout);
 			fputc('\n', stdout);
 		}
 	}
-err:
+out:
 	free(coff);
 	free(dln);
-out:
+	free(hoff);
+	free(hn);
 	free(line);
 	return rc;
 }
