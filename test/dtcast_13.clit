@@ -1,0 +1,14 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+## wrong sorting gives unexpected results
+$ < "${srcdir}/molten_02.csv" dtcast -H 'date+sym+exch~type' --col-names
+date	sym	exch	open
+2009-03-12	AX	XETR	717.24
+2009-03-12	AX	XFRA	717.25
+2009-03-12	BZX	XFRA	715.33
+2009-03-12	BZX	XETR	715.32
+2009-03-13	AX	XETR	721.13
+2009-03-13	AX	XFRA	721.14
+2009-03-13	BZX	XETR	717.34
+2009-03-13	BZX	XFRA	717.35
+$
