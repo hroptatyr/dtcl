@@ -3,6 +3,6 @@ Usage: dtcast FORMULA < FILE
 Streaming implementation of data.table's ?dcast.
 
   -H, --header          Header is present in FILE.
+  --col-names           Output column names.
   -C, --cast=COL...     Cast COLs into columns.
   --value=X             Values come from column X.
-  --col-names           Output column names.
