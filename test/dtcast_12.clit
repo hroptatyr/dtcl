@@ -1,0 +1,7 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ < "${srcdir}/molten_02.csv" dtcast -H 'date~sym+type+exch' --col-names
+date	AX*open*XETR	AX*open*XFRA	AX*high*XETR	AX*high*XFRA	AX*low*XETR	AX*low*XFRA	AX*close*XETR	AX*close*XFRA	BZX*open*XFRA	BZX*open*XETR	BZX*high*XFRA	BZX*high*XETR	BZX*low*XETR	BZX*low*XFRA	BZX*close*XETR	BZX*close*XFRA
+2009-03-12	717.24	717.25	718.47	718.48	717.24	717.25	718.42	718.42	715.33	715.32	717.58	717.57	714.65	714.66	718.35	718.36
+2009-03-13	721.13	721.14	721.24	721.25	717.02	717.03	717.14	717.15	717.35	717.34	719.27	719.26	717.34	717.35	718.00	718.01
+$

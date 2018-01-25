@@ -23,7 +23,7 @@ AM_CLIT_LOG_FLAGS = --builddir $(top_builddir)/src --verbose
 TESTS_ENVIRONMENT = LC_ALL=C
 
 EXTRA_DIST += molten_01.csv
-EXTRA_DIST += cast_01.csv
+EXTRA_DIST += molten_02.csv
 
 TESTS += dtcast_01.clit
 TESTS += dtcast_02.clit
@@ -35,5 +35,9 @@ TESTS += dtcast_07.clit
 TESTS += dtcast_08.clit
 TESTS += dtcast_09.clit
 TESTS += dtcast_10.clit
+TESTS += dtcast_11.clit
+TESTS += dtcast_12.clit
+TESTS += dtcast_13.clit
+TESTS += dtcast_14.clit
 
 ## Makefile.am ends here
