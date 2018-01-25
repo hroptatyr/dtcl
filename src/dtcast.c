@@ -866,6 +866,7 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 err:
 	free(coff);
 	free(hoff);
+	free(hn);
 out:
 	free(line);
 	return rc;
