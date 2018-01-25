@@ -1,7 +1,14 @@
-Usage: dtmelt < FILE
+Usage: dtmelt FORMULA < FILE
 
 Streaming implementation of data.table's ?melt.
 
+Unlike data.table we obtain id vars and measure vars from the
+FORMULA which is of the form LHS ~ RHS.
+
+LHS and RHS are sums of column numbers
+(or names if --header|-H is present).
+LHS is the set of id variables and
+RHS is the set of measure variables.
+
   -H, --header          Header is present in FILE
-  -M, --measure=COL...  Measure variable.
-  -I, --idvar=COL...    Identifying variable.
+  --col-names           Output column names.
