@@ -24,6 +24,8 @@ TESTS_ENVIRONMENT = LC_ALL=C
 
 EXTRA_DIST += molten_01.csv
 EXTRA_DIST += molten_02.csv
+EXTRA_DIST += cast_01.csv
+EXTRA_DIST += cast_02.csv
 
 TESTS += dtcast_01.clit
 TESTS += dtcast_02.clit
@@ -46,5 +48,7 @@ TESTS += dtmelt_03.clit
 TESTS += dtmelt_04.clit
 TESTS += dtmelt_05.clit
 TESTS += dtmelt_06.clit
+TESTS += dtmelt_07.clit
+TESTS += dtmelt_08.clit
 
 ## Makefile.am ends here
