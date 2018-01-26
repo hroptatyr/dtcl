@@ -350,7 +350,13 @@ stcc(char *const *args, size_t nargs)
 	}
 	for (size_t i = 0U; i < ncc; i++) {
 		const char *c = args[i];
-		cc[i] = hash(c, strlen(c));
+		const char *const e = c + strlen(c);;
+		size_t j = 0U;
+
+		for (const char *p; c < e; c = p + 1U) {
+			p = memchrnul(c, '*', e - c);
+			cc[i] ^= hash2(c, p - c, j++);
+		}
 	}
 	if (!cnmp) {
 		return 0;

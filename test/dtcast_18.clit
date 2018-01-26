@@ -1,0 +1,11 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ dtcast '1~2+3' <<EOF
+A	B	B	1
+A	x	x	2
+B	B	B	3
+B	x	x	4
+EOF
+A	1	2
+B	3	4
+$
