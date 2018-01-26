@@ -138,7 +138,7 @@ chck(size_t ncol)
 }
 
 static void
-phdr(const char *hdrs, const size_t *hoff)
+phdr(const char *hdrs, const size_t *hoff, size_t nxph)
 {
 	size_t i;
 
@@ -154,8 +154,54 @@ phdr(const char *hdrs, const size_t *hoff)
 		fwrite(hdrs + of, sizeof(*hdrs), eo - of - 1U, stdout);
 		fputc('\t', stdout);
 	}
-	fputs("variable\tvalue\n", stdout);
+	if (nxph <= 1U) {
+		fputs("variable\t", stdout);
+	} else for (size_t j = 0U; j < nxph; j++) {
+		fprintf(stdout, "variable%zu", j + 1U);
+		fputc('\t', stdout);
+	}
+	fputs("value\n", stdout);
 	return;
+}
+
+static size_t
+cxph(char *restrict hn, const size_t *of)
+{
+/* check if we're dealing with headers from a cross-product (A*B) */
+	size_t n = 0U;
+	size_t i;
+
+	if (!nrhs) {
+		i = rhs.v;
+		goto onh;
+	} else {
+		i = rhs.p[0U];
+	onh:;
+		const size_t bo = of[i + 0U];
+		const size_t eo = of[i + 1U];
+		const char *const ep = hn + eo - 1U;
+
+		for (char *restrict hp = hn + bo, *np;
+		     (n++, np = memchr(hp, '*', ep - hp)); hp = np + 1U) {
+			*np = '\t';
+		}
+	}
+	/* check the rest */
+	for (size_t j = 1U; j < nrhs; j++) {
+		const size_t bo = of[rhs.p[j] + 0U];
+		const size_t eo = of[rhs.p[j] + 1U];
+		const char *const ep = hn + eo - 1U;
+		size_t m = 0U;
+		for (char *restrict hp = hn + bo, *np;
+		     (m++, np = memchr(hp, '*', ep - hp)); hp = np + 1U) {
+			*np = '\t';
+		}
+		/* barf if they're of different length */
+		if (UNLIKELY(m != n)) {
+			return 0U;
+		}
+	}
+	return n;
 }
 
 static char*
@@ -325,6 +371,7 @@ proc1(void)
 	/* offsets for header and header buffer */
 	char *hn = NULL;
 	size_t *hoff = NULL;
+	size_t nxph;
 	/* constant dimension line */
 	size_t ndln = 0U;
 	size_t zdln = 0U;
@@ -369,7 +416,7 @@ Error: cannot allocate memory to hold a copy of the header");
 		}
 		if (cnmp) {
 			/* print col names */
-			phdr(hn, hoff);
+			phdr(hn, hoff, 0U);
 		}
 		goto tok;
 	}
@@ -396,9 +443,16 @@ Error: fewer columns present than needed for LHS~RHS and value");
 		rc = -1;
 		goto out;
 	}
+	/* check for cross-product headers (A*B) */
+	if (UNLIKELY(!(nxph = cxph(hn, hoff)))) {
+		errno = 0, error("\
+Error: product headers must have same number of factors");
+		rc = -1;
+		goto out;
+	}
 	if (cnmp && (nrd = getline(&line, &llen, stdin)) > 0) {
 		/* print col names */
-		phdr(hn, hoff);
+		phdr(hn, hoff, nxph);
 		goto tok;
 	}
 
