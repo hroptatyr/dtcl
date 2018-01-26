@@ -43,5 +43,7 @@ TESTS += dtcast_15.clit
 TESTS += dtcast_16.clit
 TESTS += dtcast_17.clit
 TESTS += dtcast_18.clit
+TESTS += dtcast_19.clit
+TESTS += dtcast_20.clit
 
 ## Makefile.am ends here
