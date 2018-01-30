@@ -2,12 +2,15 @@ Usage: dtcast FORMULA < FILE
 
 Streaming implementation of data.table's ?dcast.
 
-FORMULA is of the form LHS ~ RHS
+FORMULA is of the form LHS ~ RHS [~ VHS]
 
-LHS and RHS are sums of column numbers
+LHS, RHS and VHS are sums of column numbers
 (or names when --header|-H is present).
+
+The value hand-side is optional and defaults to right-most
+column that isn't mentioned in the left hand-side or the
+right hand-side.
 
   -H, --header          Header is present in FILE.
   --col-names           Output column names.
   -C, --cast=COL...     Cast COLs into columns.
-  --value=X             Values come from column X.

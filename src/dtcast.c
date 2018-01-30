@@ -80,8 +80,11 @@ static union {
 	size_t v;
 	size_t *p;
 } rhs;
-/* this one is 1-based */
-static size_t vhs;
+static size_t nvhs;
+static union {
+	size_t v;
+	size_t *p;
+} vhs;
 
 
 static void
@@ -498,11 +501,11 @@ chck(size_t ncol)
 			return -1;
 		}
 	}
-	if (vhs && vhs > ncol) {
+	if (!nvhs && vhs.v > ncol) {
 		return -1;
 	}
 	/* determine VHS as the rightmost column not used by LHS nor RHS */
-	if (UNLIKELY(!vhs && !(vhs = mvhs(ncol)))) {
+	if (UNLIKELY(!nvhs && !vhs.v && !(vhs.v = mvhs(ncol)))) {
 		return -1;
 	}
 	return 0;
@@ -608,8 +611,9 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 	static const char *form;
 	const char *elhs, *l;
 	const char *erhs, *r;
+	const char *evhs = NULL, *v = NULL;
 	const char *on;
-	size_t nl, nr;
+	size_t nl, nr, nv = 0U;
 
 	if (UNLIKELY((formula = form ?: formula) == NULL)) {
 		return !form - 1;
@@ -617,17 +621,29 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 	if ((elhs = strchr(l = form = formula, '~')) == NULL) {
 		return -1;
 	}
-	r = elhs + 1U;
-	erhs = r + strlen(r);
+	if ((erhs = strchr(r = elhs + 1U, '~')) == NULL) {
+		/* value hand side is optional */
+		erhs = r + strlen(r);
+	} else {
+		v = erhs + 1U;
+		evhs = v + strlen(v);
+	}
 
 	for (nl = 0U, on = l; (on = memchr(on, '+', elhs - on)); nl++, on++);
 	for (nr = 0U, on = r; (on = memchr(on, '+', erhs - on)); nr++, on++);
+	if (v) {
+		for (nv = 0U, on = v;
+		     (on = memchr(on, '+', evhs - on)); nv++, on++);
+	}
 
 	if (nl && !lhs.p) {
 		lhs.p = calloc(nlhs = nl + 1U, sizeof(*lhs.p));
 	}
 	if (nr && !rhs.p) {
 		rhs.p = calloc(nrhs = nr + 1U, sizeof(*rhs.p));
+	}
+	if (nv && !vhs.p) {
+		vhs.p = calloc(nvhs = nv + 1U, sizeof(*vhs.p));
 	}
 
 	/* now try and snarf the whole shebang */
@@ -680,6 +696,34 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 			rhs.v = x;
 		} else {
 			rhs.p[nr] = x;
+		}
+	}
+
+	/* snarf value hand side */
+	if (v && !nv) {
+		goto one_v;
+	}
+	for (nv = 0U; nv < nvhs; nv++, v = on + 1U) {
+		/* try with numbers first */
+		char *tmp;
+		long unsigned int x;
+
+	one_v:
+		on = memchrnul(v, '+', evhs - v);
+		if ((x = strtoul(v, &tmp, 10)) && tmp == on ||
+		    *tmp == '.' && tmp + 1 == on && !nvhs) {
+			;
+		} else if ((x = find_s(hn, of, nc, v, on - v)) < nc) {
+			/* one based */
+			x++;
+		} else {
+			return -1;
+		}
+
+		if (!nvhs) {
+			vhs.v = x;
+		} else {
+			vhs.p[nv] = x;
 		}
 	}
 	/* all is good, forget about the formula then */
@@ -813,7 +857,7 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 				goto err;
 			}
 			/* bang */
-			with (size_t of = coff[vhs - 1U], eo = coff[vhs]) {
+			with (size_t of = coff[vhs.v - 1U], eo = coff[vhs.v]) {
 				bang(line + of, eo - of - 1U, j);
 			}
 		}
@@ -862,7 +906,7 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 				break;
 			}
 			/* bang */
-			with (size_t of = coff[vhs - 1U], eo = coff[vhs]) {
+			with (size_t of = coff[vhs.v - 1U], eo = coff[vhs.v]) {
 				bang(line + of, eo - of - 1U, j);
 			}
 		}
@@ -891,16 +935,6 @@ main(int argc, char *argv[])
 	if (yuck_parse(argi, argc, argv) < 0) {
 		rc = 1;
 		goto out;
-	}
-
-	if (argi->value_arg) {
-		char *on;
-		if (!(vhs = strtoul(argi->value_arg, &on, 10)) || *on) {
-			errno = 0, error("\
-Error: invalide value column");
-			rc = 1;
-			goto out;
-		}
 	}
 
 	/* overread and/or expect headers? */
