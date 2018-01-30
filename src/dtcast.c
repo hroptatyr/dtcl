@@ -233,7 +233,9 @@ phdr(const char *hdrs, const size_t *hoff)
 		one:
 			fputc('V', stdout);
 			fprintf(stdout, "%zu", i + 1U);
-			fputc('\t' + (++j >= nlhs && !ncc), stdout);
+			if (++j < nlhs) {
+				fputc('\t', stdout);
+			}
 		}
 	} else {
 		size_t i;
@@ -249,13 +251,38 @@ phdr(const char *hdrs, const size_t *hoff)
 			const size_t of = hoff[i + 0U];
 			const size_t eo = hoff[i + 1U];
 			fwrite(hdrs + of, sizeof(*hdrs), eo - of - 1U, stdout);
-			fputc('\t' + (++j >= nlhs && !ncc), stdout);
+			if (++j < nlhs) {
+				fputc('\t', stdout);
+			}
 		}
 	}
-	for (size_t i = 0U; i < ncc; i++) {
-		fputs(cn[i], stdout);
-		fputc('\t' + (i + 1 >= ncc), stdout);
+	if (!nvhs) {
+		for (size_t i = 0U; i < ncc; i++) {
+			fputc('\t', stdout);
+			fputs(cn[i], stdout);
+		}
+	} else if (hdrs == NULL) {
+		for (size_t i = 0U; i < ncc; i++) {
+			for (size_t j = 0U; j < nvhs; j++) {
+				fputc('\t', stdout);
+				fputs(cn[i], stdout);
+				fputc('*', stdout);
+				fputc('V', stdout);
+				fprintf(stdout, "%zu", vhs.p[j]);
+			}
+		}
+	} else for (size_t i = 0U; i < ncc; i++) {
+		for (size_t j = 0U; j < nvhs; j++) {
+			const size_t of = hoff[vhs.p[j] - 1U];
+			const size_t eo = hoff[vhs.p[j] - 0U];
+
+			fputc('\t', stdout);
+			fputs(cn[i], stdout);
+			fputc('*', stdout);
+			fwrite(hdrs + of, sizeof(*hdrs), eo - of - 1U, stdout);
+		}
 	}
+	fputc('\n', stdout);
 	return;
 }
 
@@ -295,25 +322,46 @@ rset(const char *line, const size_t *coff)
 }
 
 static void
-bang(const char *str, size_t len, size_t j)
+bang(const char *line, const size_t *coff, size_t j)
 {
-	size_t eo = ccvo[j][nccv[j]];
+	size_t len;
+	size_t nj;
 
-	if (UNLIKELY(eo + len >= zccv[j])) {
+	/* determine length */
+	if (!nvhs) {
+		const size_t bo = coff[vhs.v - 1U];
+		const size_t eo = coff[vhs.v - 0U];
+		len = eo - bo - 1U;
+	} else for (size_t i = len = 0U; i < nvhs; i++) {
+		const size_t bo = coff[vhs.p[i] - 1U];
+		const size_t eo = coff[vhs.p[i] - 0U];
+		len += eo - bo;
+	}
+
+	if (UNLIKELY((nj = ccvo[j][nccv[j]]) + len >= zccv[j])) {
 		/* resize */
-		while ((zccv[j] = (zccv[j] * 2U) ?: 64U) < ccvo[j][nccv[j]]);
+		while ((zccv[j] = (zccv[j] * 2U) ?: 64U) < nj + len);
 		ccv[j] = realloc(ccv[j], zccv[j] * sizeof(*ccv[j]));
 	}
 
-	memcpy(ccv[j] + eo, str, len);
-	eo += len;
+	if (!nvhs) {
+		const size_t bo = coff[vhs.v - 1U];
+		memcpy(ccv[j] + nj, line + bo, len);
+		nj += len;
+	} else for (size_t i = 0U; i < nvhs; i++) {
+		const size_t bo = coff[vhs.p[i] - 1U];
+		const size_t eo = coff[vhs.p[i] - 0U];
+		memcpy(ccv[j] + nj, line + bo, eo - bo - 1U);
+		ccv[j][nj += eo - bo - 1U] = '\t';
+		nj += i + 1U < nvhs;
+	}
 
 	if (UNLIKELY(++nccv[j] >= zccvo[j])) {
 		zccvo[j] *= 2U;
 		ccvo[j] = realloc(ccvo[j], zccvo[j] * sizeof(*ccvo[j]));
 	}
 	/* store current end */
-	ccvo[j][nccv[j]] = eo;
+	ccvo[j][nccv[j]] = nj;
 	return;
 }
 
@@ -857,9 +905,7 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 				goto err;
 			}
 			/* bang */
-			with (size_t of = coff[vhs.v - 1U], eo = coff[vhs.v]) {
-				bang(line + of, eo - of - 1U, j);
-			}
+			bang(line, coff, j);
 		}
 	}
 
@@ -906,9 +952,7 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 				break;
 			}
 			/* bang */
-			with (size_t of = coff[vhs.v - 1U], eo = coff[vhs.v]) {
-				bang(line + of, eo - of - 1U, j);
-			}
+			bang(line, coff, j);
 		}
 	}
 	/* print the last one */
