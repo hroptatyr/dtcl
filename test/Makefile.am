@@ -47,6 +47,14 @@ TESTS += dtcast_17.clit
 TESTS += dtcast_18.clit
 TESTS += dtcast_19.clit
 TESTS += dtcast_20.clit
+TESTS += dtcast_21.clit
+TESTS += dtcast_22.clit
+TESTS += dtcast_23.clit
+TESTS += dtcast_24.clit
+TESTS += dtcast_25.clit
+TESTS += dtcast_26.clit
+TESTS += dtcast_27.clit
+TESTS += dtcast_28.clit
 
 TESTS += dtmelt_01.clit
 TESTS += dtmelt_02.clit
