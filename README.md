@@ -56,5 +56,53 @@ One more?
     2009-03-13	BZX	5	717.34
     2009-03-13	BZX	6	718.00
 
+Oh, but data.table can also cast more than one column, can't you?
+
+    $ dtcast -H 'date+sym~exch+type' --col-names <<EOF
+    date	sym	type	exch	val
+    2009-03-12	AX	open	XETR	717.24
+    2009-03-12	AX	open	XFRA	717.25
+    2009-03-12	AX	close	XETR	718.42
+    2009-03-12	AX	close	XFRA	718.42
+    2009-03-12	BZX	open	XFRA	715.33
+    2009-03-12	BZX	open	XETR	715.32
+    2009-03-12	BZX	close	XETR	718.35
+    2009-03-12	BZX	close	XFRA	718.36
+    2009-03-13	AX	open	XETR	721.13
+    2009-03-13	AX	open	XFRA	721.14
+    2009-03-13	AX	close	XETR	717.14
+    2009-03-13	AX	close	XFRA	717.15
+    2009-03-13	BZX	open	XETR	717.34
+    2009-03-13	BZX	open	XFRA	717.35
+    2009-03-13	BZX	close	XETR	718.00
+    2009-03-13	BZX	close	XFRA	718.01
+    EOF
+    =>
+    date	sym	XETR*open	XFRA*open	XETR*close	XFRA*close
+    2009-03-12	AX	717.24	717.25	718.42	718.42
+    2009-03-12	BZX	715.32	715.33	718.35	718.36
+    2009-03-13	AX	721.13	721.14	717.14	717.15
+    2009-03-13	BZX	717.34	717.35	718.00	718.01
+
+No, I meant multiple value colums.
+
+    $ dtcast -H 'date+sym~type~val1+val2' --col-names <<EOF
+    date	sym	type	val1	val2
+    2009-03-12	AX	open	4	717.24
+    2009-03-12	AX	close	6	718.42
+    2009-03-12	BZX	open	9	715.33
+    2009-03-12	BZX	close	7	718.35
+    2009-03-13	AX	open	3	721.13
+    2009-03-13	AX	close	5	717.14
+    2009-03-13	BZX	open	5	717.34
+    2009-03-13	BZX	close	3	718.00
+    EOF
+    =>
+    date	sym	open*val1	open*val2	close*val1	close*val2
+    2009-03-12	AX	4	717.24	6	718.42
+    2009-03-12	BZX	9	715.33	7	718.35
+    2009-03-13	AX	3	721.13	5	717.14
+    2009-03-13	BZX	5	717.34	3	718.00
+
 
   [1]: http://github.com/Rdatatable/data.table/wiki
