@@ -315,6 +315,12 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 		} else if ((x = find_s(hn, of, nc, l, on - l)) < nc) {
 			;
 		} else {
+			/* retry next time */
+			if (lhs.v + 1U) {
+				free(lhs.p);
+			}
+			lhs.v = -1;
+			nlhs = 0U;
 			return -1;
 		}
 
@@ -326,7 +332,9 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 	}
 
 	/* snarf right hand side */
-	if (!nr) {
+	if (!nr && !memcmp(r, "...\0", 4U)) {
+		return 0;
+	} else if (!nr) {
 		goto one_r;
 	}
 	for (nr = 0U; nr < nrhs; nr++, r = on + 1U) {
@@ -336,9 +344,7 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 
 	one_r:
 		on = memchrnul(r, '+', erhs - r);
-		if ((x = strtoul(r, &tmp, 10)) && tmp == on ||
-		    tmp + 3U == on && !nrhs &&
-		    tmp[0U] == '.' && tmp[1U] == '.' && tmp[2U] == '.') {
+		if ((x = strtoul(r, &tmp, 10)) && tmp == on) {
 			x--;
 		} else if ((x = find_s(hn, of, nc, r, on - r)) < nc) {
 			;
@@ -390,7 +396,7 @@ Error: cannot read lines");
 Error: cannot determine number of columns");
 		rc = -1;
 		goto out;
-	} else if (UNLIKELY(chck(ncol) < 0)) {
+	} else if (UNLIKELY(chck(ncol) < !hdrp - 1)) {
 		errno = 0, error("\
 Error: fewer columns present than needed for id or measure vars");
 		rc = -1;

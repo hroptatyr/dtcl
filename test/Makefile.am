@@ -64,5 +64,7 @@ TESTS += dtmelt_05.clit
 TESTS += dtmelt_06.clit
 TESTS += dtmelt_07.clit
 TESTS += dtmelt_08.clit
+TESTS += dtmelt_09.clit
+TESTS += dtmelt_10.clit
 
 ## Makefile.am ends here

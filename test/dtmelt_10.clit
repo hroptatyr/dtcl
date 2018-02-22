@@ -1,0 +1,21 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ cut -f2- "${srcdir}/cast_01.csv" | dtmelt -H 'sym~...' --col-names
+sym	variable	value
+AX	open	717.25
+AX	high	718.47
+AX	low	717.25
+AX	close	718.42
+BZX	open	715.32
+BZX	high	717.57
+BZX	low	714.65
+BZX	close	718.35
+AX	open	721.14
+AX	high	721.24
+AX	low	717.02
+AX	close	717.14
+BZX	open	717.34
+BZX	high	719.26
+BZX	low	717.34
+BZX	close	718.00
+$
