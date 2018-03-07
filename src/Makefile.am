@@ -28,6 +28,9 @@ BUILT_SOURCES += dtcast.yucc
 bin_PROGRAMS += dtmelt
 BUILT_SOURCES += dtmelt.yucc
 
+bin_PROGRAMS += dtrbind
+BUILT_SOURCES += dtrbind.yucc
+
 bin_PROGRAMS += lines
 BUILT_SOURCES += lines.yucc
 
