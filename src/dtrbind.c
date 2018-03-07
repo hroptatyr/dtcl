@@ -203,6 +203,36 @@ proc_res(FILE *fp)
 	}
 	/* lest we forget */
 	iperm += ncol;
+
+	/* check for identity mapping */
+	for (size_t i = 0U; i < ncol; i++) {
+		if (invp[i] != i + 1U) {
+			goto non_triv;
+		}
+	}
+	/* yay, identity mapping is much simpler */
+	with (size_t coff[ncol + 1U]) {
+		char res[nhof - ncol + 1U];
+		size_t nr = 1U;
+
+		/* prepare rest of line */
+		memset(res, '\t', nhof - ncol);
+		res[nhof - ncol] = '\n';
+		while ((nrd = getline(&line, &llen, fp)) > 0) {
+			nr++;
+			if (UNLIKELY(tokln1(coff, ncol, line, nrd) < ncol)) {
+				errno = 0, error("\
+Error: line %zu has fewer than %zu columns", nr, ncol);
+				rc = 2;
+				break;
+			}
+			fwrite(line, 1, coff[ncol] - 1U, stdout);
+			fwrite(res, 1, nhof - ncol + 1U, stdout);
+		}
+	}
+	return rc;
+
+non_triv:
 	with (size_t coff[ncol + 1U]) {
 		size_t nr = 1U;
 		while ((nrd = getline(&line, &llen, fp)) > 0) {
