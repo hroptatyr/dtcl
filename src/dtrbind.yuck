@@ -1,0 +1,5 @@
+Usage: dtrbind FILE...
+
+Concatenate FILEs (with headers).
+
+  --col-names           Output column names.
