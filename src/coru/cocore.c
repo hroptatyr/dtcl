@@ -263,7 +263,7 @@ static struct stack *create_stack(
     stack->current = coroutine;
     stack->ref_count = 1;
     if (check_stack)
-        memset(FRAME_START(alloc_base, alloc_base + guard_size),
+        memset(FRAME_START(alloc_base, (char*)alloc_base + guard_size),
             0xC5, stack_size);
     return stack;
 }
@@ -413,7 +413,7 @@ struct cocore *initialise_cocore_thread(void)
     void *stack = malloc(FRAME_SWITCHER_STACK);
     state->switcher_coroutine = create_frame(
         STACK_BASE(stack, FRAME_SWITCHER_STACK), frame_switcher, state);
-    VALGRIND_STACK_REGISTER(stack, stack + FRAME_SWITCHER_STACK);
+    VALGRIND_STACK_REGISTER(stack, (char*)stack + FRAME_SWITCHER_STACK);
 
     return coroutine;
 }
@@ -504,11 +504,11 @@ static void delete_cocore(struct cocore *coroutine)
 
 /* Switches control to target coroutine passing the given parameter.  Depending
  * on stack frame sharing the switching process may be more or less involved. */
-const void *switch_cocore(struct cocore *target, const void *inarg)
+void *switch_cocore(struct cocore *target, void *inarg)
 {
     assert(target->state == GET_TLS(cocore_state));
     struct cocore *this = target->state->current_coroutine;
-    const void *result;
+    void *result;
     if (target->stack->current == target) {
         /* No stack retargeting required, simply switch to already available
          * stack frame. */

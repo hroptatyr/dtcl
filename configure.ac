@@ -42,6 +42,7 @@ AX_CHECK_YUCK
 AX_CHECK_CLITORIS
 
 SXE_CHECK_ASM_CORUS
+AM_CONDITIONAL([HAVE_ASM_COROUTINES], [test "${use_asm_corus}" = "yes"])
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([build-aux/Makefile])

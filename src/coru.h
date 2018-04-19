@@ -63,7 +63,6 @@
 #define NEXT1(x, o)	(intptr_t)(check_cocore(x) ? SWITCH(x, o) : NULL)
 #define NEXT(x)		NEXT1(x, NULL)
 #define YIELD(o)	((intptr_t)SWITCH((ctx->next), (o)))
-//#define YIELD(o)	({static typeof(o) TMP(x); TMP(x) = o; _YIELD(&TMP(x));})
 #define RETURN(o)	return (intptr_t)(o)
 
 #define DEFCORU(name, closure, arg)			\
