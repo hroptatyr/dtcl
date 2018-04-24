@@ -8,3 +8,4 @@ with column Cr in the right file.
 
   -H, --header          Header is present in FILE
   --col-names           Output column names.
+  --all[=?]             Print outer join, or (l)eft or (r)ight join.

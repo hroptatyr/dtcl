@@ -624,6 +624,15 @@ Error: cannot open `%s' for reading", argi->args[1U]);
 	/* keep track of the formula */
 	form = argi->args[2U];
 
+	if (argi->all_arg) {
+		allx = argi->all_arg == YUCK_OPTARG_NONE ||
+			*argi->all_arg == 'l' ||
+			*argi->all_arg == 'x';
+		ally = argi->all_arg == YUCK_OPTARG_NONE ||
+			*argi->all_arg == 'r' ||
+			*argi->all_arg == 'y';
+	}
+
 	/* get the coroutines going */
 	initialise_cocore();
 
