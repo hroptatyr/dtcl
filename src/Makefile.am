@@ -48,6 +48,9 @@ bin_PROGRAMS += dtrbind
 BUILT_SOURCES += dtrbind.yucc
 
 if HAVE_ASM_COROUTINES
+bin_PROGRAMS += dtmerge
+dtmerge_LDADD = libcoru.a
+BUILT_SOURCES += dtmerge.yucc
 endif  HAVE_ASM_COROUTINES
 
 bin_PROGRAMS += lines
