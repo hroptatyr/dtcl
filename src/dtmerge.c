@@ -256,7 +256,7 @@ snrf(struct hs_s *restrict tg, const char *hn, const size_t *of, size_t nc, size
 /* snarf FORM (global) into temporary TG based on header line HN and header OF
    over NC columns, I-th file, i.e. skip I = tokens in formula */
 	const char *ej, *j;
-	const char *on, *om;
+	const char *on;
 	size_t nj;
 
 	j = form;
@@ -273,13 +273,19 @@ snrf(struct hs_s *restrict tg, const char *hn, const size_t *of, size_t nc, size
 	}
 	/* now try and snarf the whole shebang */
 	for (nj = 0U; nj < tg->n; nj++, j = on + 1U) {
-		/* try with numbers first */
+		const char *om;
 		char *tmp;
 		long unsigned int x;
+		size_t k;
 
 	one_j:
 		on = memchrnul(j, '+', ej - j);
-		om = memchrnul(j, '=', on - j);
+		k = 0U;
+		do {
+			om = memchrnul(j, '=', on - j);
+		} while (om < on && k++ < i && (j = om + 1U, true));
+
+		/* try with numbers first */
 		if ((x = strtoul(j, &tmp, 10)) && tmp == om) {
 			x--;
 		} else if ((x = find_s(hn, of, nc, j, om - j)) < nc) {
@@ -473,6 +479,8 @@ out:
 static void
 prnt(const struct beef_s *x, const struct beef_s *y)
 {
+	static const char tabs[] = "\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t";
+
 	if (x && y) {
 		fwrite(y->dln, 1, y->ndln, stdout);
 	} else if (x && allx) {
@@ -488,9 +496,10 @@ prnt(const struct beef_s *x, const struct beef_s *y)
 			prnc(x->line, x->coff, vc[L].p[i]);
 		}
 	} else if (ally) {
-		for (size_t i = 0U; i < vc[L].n; i++) {
-			fputc('\t', stdout);
+		for (size_t i = 0U; i < vc[L].n / 16U; i++) {
+			fwrite(tabs, sizeof(*tabs), countof(tabs), stdout);
 		}
+		fwrite(tabs, sizeof(*tabs), vc[L].n % 16U, stdout);
 	}
 	if (y) {
 		for (size_t i = 0U; i < vc[R].n; i++) {
@@ -498,9 +507,10 @@ prnt(const struct beef_s *x, const struct beef_s *y)
 			prnc(y->line, y->coff, vc[R].p[i]);
 		}
 	} else if (allx) {
-		for (size_t i = 0U; i < vc[R].n; i++) {
-			fputc('\t', stdout);
+		for (size_t i = 0U; i < vc[R].n / 16U; i++) {
+			fwrite(tabs, sizeof(*tabs), countof(tabs), stdout);
 		}
+		fwrite(tabs, sizeof(*tabs), vc[R].n % 16U, stdout);
 	}
 	fputc('\n', stdout);
 	return;
@@ -534,23 +544,35 @@ proc(FILE *fpx, FILE *fpy)
 					prnt(&bx, NULL);
 				} while ((sx = NEXT1(px, &bx)) > 0 &&
 					 strcmp(bx.dln, by.dln) < 0);
+				if (sx <= 0) {
+					/* short circuit to by
+					 * sy was guaranteed to be > 0 */
+					goto rest_y;
+				}
 			} else if (c > 0) {
 				/* bx first, then by */
 				do {
 					prnt(NULL, &by);
 				} while ((sy = NEXT1(py, &by)) > 0 &&
 					 strcmp(bx.dln, by.dln) > 0);
+				if (sy <= 0) {
+					/* short-circuit to bx
+					 * sx was guaranteed to be > 0 */
+					goto rest_x;
+				}
 			} else {
 				/* keys are equal do a col-by-col comparison */
 				prnt(&bx, &by);
 			}
 		} else if (sx > 0) {
+		rest_x:
 			/* we're out of BYs */
 			do {
 				prnt(&bx, NULL);
 			} while ((sx = NEXT1(px, &bx)) > 0);
 			break;
 		} else if (sy > 0) {
+		rest_y:
 			/* we're out of BXs */
 			do {
 				prnt(&by, NULL);
