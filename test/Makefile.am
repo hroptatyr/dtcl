@@ -72,4 +72,18 @@ TESTS += dtmelt_10.clit
 TESTS += dtrbind_01.clit
 TESTS += dtrbind_02.clit
 
+if HAVE_ASM_COROUTINES
+TESTS += dtmerge_01.clit
+TESTS += dtmerge_02.clit
+TESTS += dtmerge_03.clit
+TESTS += dtmerge_04.clit
+TESTS += dtmerge_05.clit
+TESTS += dtmerge_06.clit
+TESTS += dtmerge_07.clit
+TESTS += dtmerge_08.clit
+endif  HAVE_ASM_COROUTINES
+EXTRA_DIST += merge_01.csv
+EXTRA_DIST += merge_02.csv
+EXTRA_DIST += merge_03.csv
+
 ## Makefile.am ends here
