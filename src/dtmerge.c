@@ -575,7 +575,7 @@ proc(FILE *fpx, FILE *fpy)
 		rest_y:
 			/* we're out of BXs */
 			do {
-				prnt(&by, NULL);
+				prnt(NULL, &by);
 			} while ((sy = NEXT1(py, &by)) > 0);
 			break;
 		}
