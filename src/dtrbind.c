@@ -121,9 +121,10 @@ addhdr(const char *s, size_t n)
 
 	pivot = s[n - 1U];
 	for (const char *hp = hdr, *const ep = hdr + nhdr, *x;
-	     hp < ep && (x = memchr(hp, pivot, ep - hp)) != NULL; hp = x + n) {
+	     hp < ep && (x = memchr(hp, pivot, ep - hp)) != NULL; hp = x + 1U) {
 		const char *b = x - (n - 1U);
-		if (b >= hdr && !memcmp(b, s, n) && b[n] == '\t') {
+		if (b > hdr && b[-1] == '\t' && b[n] == '\t' &&
+		    !memcmp(b, s, n)) {
 			/* found him */
 			const size_t o = b - hdr;
 			size_t i;
@@ -289,6 +290,8 @@ Error: cannot allocate space for header");
 		rc = 1;
 		goto out;
 	}
+	/* employ framing character */
+	hdr[nhdr++] = '\t';
 
 	if (UNLIKELY((hof = malloc((zhof = 32U) * sizeof(*hof))) == NULL)) {
 		error("\
@@ -317,7 +320,7 @@ Warning: header unreadable in file `%s'", argi->args[i]);
 
 	if (argi->col_names_flag && nhdr) {
 		hdr[nhdr - 1U] = '\n';
-		fwrite(hdr, 1, nhdr, stdout);		
+		fwrite(hdr + 1U, 1, nhdr - 1U, stdout);
 	}
 
 	/* snarf residuals */
