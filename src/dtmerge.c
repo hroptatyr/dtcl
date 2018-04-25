@@ -96,6 +96,13 @@ memchrnul(const char *s, int c, size_t z)
 	return memchr(s, c, z) ?: s + z;
 }
 
+static inline const char*
+eatws(const char *s)
+{
+	for (; (unsigned char)(*s - 1) < ' '; s++);
+	return s;
+}
+
 
 static int
 chck(struct hs_s *tg, const struct hs_s *sr, size_t ncol)
@@ -236,6 +243,9 @@ static ssize_t
 find_s(const char *ss, const size_t *of, size_t nc, const char *s, size_t z)
 {
 /* find S of size Z in {SS + OF} */
+	/* eat whitespace */
+	for (; z > 0 && (unsigned char)(*s - 1) < ' '; s++, z--);
+	for (; z > 0 && (unsigned char)(s[z - 1U] - 1) < ' '; z--);
 	for (size_t i = 0U; i < nc; i++) {
 		const size_t bo = of[i + 0U];
 		const size_t eo = of[i + 1U];
@@ -284,7 +294,7 @@ snrf(struct hs_s *restrict tg, const char *hn, const size_t *of, size_t nc, size
 		} while (om < on && k++ < i && (j = om + 1U, true));
 
 		/* try with numbers first */
-		if ((x = strtoul(j, &tmp, 10)) && tmp == om) {
+		if ((x = strtoul(j, &tmp, 10)) && eatws(tmp) == om) {
 			x--;
 		} else if ((x = find_s(hn, of, nc, j, om - j)) < nc) {
 			;
