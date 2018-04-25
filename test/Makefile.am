@@ -81,6 +81,10 @@ TESTS += dtmerge_05.clit
 TESTS += dtmerge_06.clit
 TESTS += dtmerge_07.clit
 TESTS += dtmerge_08.clit
+TESTS += dtmerge_09.clit
+TESTS += dtmerge_10.clit
+TESTS += dtmerge_11.clit
+TESTS += dtmerge_12.clit
 endif  HAVE_ASM_COROUTINES
 EXTRA_DIST += merge_01.csv
 EXTRA_DIST += merge_02.csv

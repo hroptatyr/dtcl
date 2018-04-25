@@ -71,14 +71,6 @@ static struct hs_s vc[2U] = {{0, -1}, {0, -1}};
 char *hdr;
 size_t nhdr;
 size_t zhdr;
-size_t *hof;
-size_t nhof;
-size_t zhof;
-/* file permutations
- * length + length*beef ... */
-size_t *perm;
-size_t nperm;
-size_t zperm;
 
 
 static void
@@ -150,56 +142,62 @@ chck(struct hs_s *tg, const struct hs_s *sr, size_t ncol)
 	return 0;
 }
 
-static void
-phdr(const char *hdrs, const size_t *hoff)
+static int
+hdrs(const struct hs_s *x, const char *ln, const size_t *restrict of, char hc)
 {
-	size_t i;
+	if (of) {
+		size_t c;
 
-	if (!jc[L].n) {
-		i = jc[L].v;
-		goto onl;
-	}
-	for (size_t j = 0U; j < jc[L].n; j++) {
-		i = jc[L].p[j];
-	onl:;
-		const size_t of = hoff[i + 0U];
-		const size_t eo = hoff[i + 1U];
-		fwrite(hdrs + of, sizeof(*hdrs), eo - of - 1U, stdout);
-		fputc('\t', stdout);
-	}
-	if (!jc[R].n) {
-		i = jc[R].v;
-		goto onr;
-	}
-	for (size_t j = 0U; j < jc[R].n; j++) {
-		i = jc[R].p[j];
-	onr:;
-		const size_t of = hoff[i + 0U];
-		const size_t eo = hoff[i + 1U];
-		fwrite(hdrs + of, sizeof(*hdrs), eo - of - 1U, stdout);
-		fputc('\t', stdout);
-	}
-	fputs("value\n", stdout);
-	return;
-}
+		if (!x->n) {
+			c = x->v;
+			goto ons;
+		} else for (size_t i = 0U; i < x->n; i++) {
+			const char *s;
+			size_t n;
 
-static char*
-mkhdrs(size_t *restrict of, size_t nc)
-{
-	size_t z = 64U;
-	char *r = malloc(z * sizeof(*r));
-	for (size_t i = 0U, n = 0U; i < nc; i++, n++) {
-		int m = snprintf(r + n, z - n, "V%zu", i + 1U);
-		if (n + m >= z) {
-			z *= 2U;
-			r = realloc(r, z * sizeof(*r));
-			/* reprint */
-			snprintf(r + n, z - n, "V%zu", i + 1U);
+			c = x->p[i];
+		ons:
+			s = ln + of[c];
+			n = of[c + 1U] - of[c + 0U] - 1U;
+			if (UNLIKELY(nhdr + n + 2U >= zhdr)) {
+				while ((zhdr *= 2U) < nhdr + n);
+				hdr = realloc(hdr, zhdr * sizeof(*hdr));
+			}
+			memcpy(hdr + nhdr, s, n);
+			nhdr += n;
+			hdr[nhdr] = '.';
+			nhdr += !!hc;
+			hdr[nhdr] = hc;
+			nhdr += !!hc;
+			hdr[nhdr++] = '\t';
 		}
-		of[i + 0U] = n;
-		of[i + 1U] = (n += m) + 1U;
+	} else {
+		size_t c;
+
+		if (!x->n) {
+			c = x->v;
+			goto onc;
+		} else for (size_t i = 0U; i < x->n; i++) {
+			int m;
+
+			c = x->p[i];
+		onc:
+			m = snprintf(hdr + nhdr, zhdr - nhdr, "V%zu", c + 1U);
+			if (UNLIKELY(nhdr + m + 2U >= zhdr)) {
+				zhdr *= 2U;
+				hdr = realloc(hdr, zhdr * sizeof(*hdr));
+				/* reprint */
+				snprintf(hdr + nhdr, zhdr - nhdr, "V%zu", ++c);
+			}
+			nhdr += m;
+			hdr[nhdr] = '.';
+			nhdr += !!hc;
+			hdr[nhdr] = hc;
+			nhdr += !!hc;
+			hdr[nhdr++] = '\t';
+		}
 	}
-	return r;
+	return 0;
 }
 
 
@@ -341,9 +339,6 @@ DEFCORU(co_proc1, {
 	size_t fibre = CORU_CLOSUR(fibre);
 	size_t llen = 0U;
 	struct beef_s b = {0U};
-	/* offsets for header and header buffer */
-	char *hn = NULL;
-	size_t *hoff = NULL;
 	/* constant dimension line */
 	size_t zdln = 0U;
 	int rc = 0;
@@ -366,28 +361,12 @@ Error: cannot determine number of columns");
 Error: cannot allocate memory to hold one line");
 		rc = -1;
 		goto out;
-	} else if (UNLIKELY(!(hoff = calloc(b.ncol + 1U, sizeof(*hoff))))) {
-		error("\
-Error: cannot allocate memory to hold a copy of the header");
-		rc = -1;
-		goto out;
 	}
+	/* tokenise once */
+	tokln1(b.coff, b.ncol, b.line, b.nrd);
 
-	if (hdrp) {
-		/* snarf col names as defined in header */
-		if (UNLIKELY((hn = strndup(b.line, b.nrd)) == NULL)) {
-			error("\
-Error: cannot allocate memory to hold a copy of the header");
-			rc = -1;
-			goto out;
-		}
-		tokln1(hoff, b.ncol, b.line, b.nrd);
-		for (size_t i = 1U; i <= b.ncol; i++) {
-			hn[hoff[i] - 1U] = '\0';
-		}
-	}
 	/* we might need to rescan the formula now */
-	if (UNLIKELY(snrf(&jc[fibre], hn, hoff, b.ncol, fibre)) < 0) {
+	if (UNLIKELY(snrf(&jc[fibre], b.line, b.coff, b.ncol, fibre)) < 0) {
 		error("\
 Error: cannot interpret formula");
 		rc = -1;
@@ -399,23 +378,27 @@ Error: fewer columns present than needed for formula");
 		goto out;
 	}
 
-	if (!hdrp) {
-		if (UNLIKELY((hn = mkhdrs(hoff, b.ncol)) == NULL)) {
+	if (cnmp) {
+		/* record header line */
+		const char *ln = hdrp ? b.line : NULL;
+		size_t *of = hdrp ? b.coff : NULL;
+		char hc = 'x' + fibre;
+
+		if (!fibre && UNLIKELY(hdrs(jc, ln, of, 0) < 0)) {
 			error("\
 Error: cannot allocate memory to hold a copy of the header");
 			rc = -1;
 			goto out;
 		}
-		if (cnmp) {
-			/* print col names */
-			phdr(hn, hoff);
+		if (UNLIKELY(hdrs(&vc[fibre], ln, of, hc) < 0)) {
+			error("\
+Error: cannot allocate memory to hold a copy of the header");
+			rc = -1;
+			goto out;
 		}
-		goto tok;
 	}
 
-	if (cnmp && (b.nrd = getline(&b.line, &llen, fp)) > 0) {
-		/* print col names */
-		phdr(hn, hoff);
+	if (!hdrp) {
 		goto tok;
 	}
 
@@ -470,8 +453,6 @@ out:
 	}
 	free(b.coff);
 	free(b.dln);
-	free(hoff);
-	free(hn);
 	free(b.line);
 	return rc;
 }
@@ -530,6 +511,11 @@ proc(FILE *fpx, FILE *fpy)
 	struct beef_s by;
 	int sx = NEXT1(px, &bx);
 	int sy = NEXT1(py, &by);
+
+	if (cnmp && sx > 0 && sy > 0) {
+		hdr[nhdr - 1U] = '\n';
+		fwrite(hdr + 1U, sizeof(*hdr), nhdr - 1U, stdout);
+	}
 
 	for (; sx > 0 || sy > 0;
 	     sx = NEXT1(px, &bx), sy = NEXT1(py, &by)) {
@@ -646,25 +632,9 @@ Error: cannot allocate space for header");
 	/* start with a framing character */
 	hdr[nhdr++] = '\t';
 
-	if (UNLIKELY((hof = malloc((zhof = 32U) * sizeof(*hof))) == NULL)) {
-		error("\
-Error: cannot allocate space for header");
-		rc = 1;
-		goto out;
-	}
-
-	if (UNLIKELY((perm = malloc((zperm = 32U) * sizeof(*perm))) == NULL)) {
-		error("\
-Error: cannot allocate space for header permutation");
-		rc = 1;
-		goto clo;
-	}
-
 	rc = proc(fpx, fpy) < 0;
 
 	free(hdr);
-	free(hof);
-	free(perm);
 
 clo:
 	if (fpx) {
