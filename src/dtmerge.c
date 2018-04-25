@@ -433,10 +433,10 @@ Error: line %zu has only %zu columns, expected %zu", b.nr, nf, b.ncol);
 			}
 			memcpy(b.dln + b.ndln, b.line + bo, eo - bo - 1);
 			b.ndln += eo - bo - 1;
-			b.dln[b.ndln] = '\t';
+			b.dln[b.ndln++] = '\t';
 		}
 		/* terminate dln */
-		b.dln[b.ndln] = '\0';
+		b.dln[--b.ndln] = '\0';
 
 		/* prep yield */
 		*(struct beef_s*)arg = b;
