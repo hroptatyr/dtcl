@@ -517,21 +517,19 @@ proc(FILE *fpx, FILE *fpy)
 		fwrite(hdr + 1U, sizeof(*hdr), nhdr - 1U, stdout);
 	}
 
-	for (; sx > 0 || sy > 0;
+	for (int c; sx > 0 || sy > 0;
 	     sx = NEXT1(px, &bx), sy = NEXT1(py, &by)) {
 		if (sx > 0 && sy > 0) {
-			int c = strcmp(bx.dln, by.dln);
-
 		redo:
+			c = strcmp(bx.dln, by.dln);
+
 			if (0) {
 				;
 			} else if (c < 0) {
 				/* bx first, then by */
-				do {
-					prnt(&bx, NULL);
-				} while ((sx = NEXT1(px, &bx)) > 0 &&
-					 (c = strcmp(bx.dln, by.dln)) < 0);
-				if (sx <= 0) {
+				prnt(&bx, NULL);
+
+				if ((sx = NEXT1(px, &bx)) <= 0) {
 					/* short circuit to by
 					 * sy was guaranteed to be > 0 */
 					goto rest_y;
@@ -539,11 +537,9 @@ proc(FILE *fpx, FILE *fpy)
 				goto redo;
 			} else if (c > 0) {
 				/* bx first, then by */
-				do {
-					prnt(NULL, &by);
-				} while ((sy = NEXT1(py, &by)) > 0 &&
-					 (c = strcmp(bx.dln, by.dln)) > 0);
-				if (sy <= 0) {
+				prnt(NULL, &by);
+
+				if ((sy = NEXT1(py, &by)) <= 0) {
 					/* short-circuit to bx
 					 * sx was guaranteed to be > 0 */
 					goto rest_x;
