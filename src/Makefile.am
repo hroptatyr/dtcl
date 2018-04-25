@@ -7,9 +7,9 @@ AM_LDFLAGS = $(XCCLDFLAGS)
 
 bin_PROGRAMS =
 noinst_PROGRAMS =
-lib_LTLIBRARIES =
-noinst_LTLIBRARIES =
-pkglib_LTLIBRARIES =
+lib_LIBRARIES =
+noinst_LIBRARIES =
+pkglib_LIBRARIES =
 noinst_HEADERS =
 BUILT_SOURCES =
 EXTRA_DIST = $(BUILT_SOURCES)
@@ -21,6 +21,22 @@ EXTRA_DIST += version.c.in
 
 noinst_HEADERS += nifty.h
 
+if HAVE_ASM_COROUTINES
+noinst_LIBRARIES += libcoru.a
+libcoru_a_SOURCES =
+EXTRA_libcoru_a_SOURCES =
+libcoru_a_SOURCES += coru/cocore.c coru/cocore.h
+libcoru_a_SOURCES += coru/switch.c coru/switch.h
+libcoru_a_SOURCES += coru/platform.h
+libcoru_a_SOURCES += coru/valgrind.h
+libcoru_a_SOURCES += coru/memcheck.h
+libcoru_a_SOURCES += coru.h
+EXTRA_libcoru_a_SOURCES += coru/switch-arm.c
+EXTRA_libcoru_a_SOURCES += coru/switch-ppc_osx.c
+EXTRA_libcoru_a_SOURCES += coru/switch-x86.c
+EXTRA_libcoru_a_SOURCES += coru/switch-x86_64.c
+endif  HAVE_ASM_COROUTINES
+
 
 bin_PROGRAMS += dtcast
 BUILT_SOURCES += dtcast.yucc
@@ -30,6 +46,12 @@ BUILT_SOURCES += dtmelt.yucc
 
 bin_PROGRAMS += dtrbind
 BUILT_SOURCES += dtrbind.yucc
+
+if HAVE_ASM_COROUTINES
+bin_PROGRAMS += dtmerge
+dtmerge_LDADD = libcoru.a
+BUILT_SOURCES += dtmerge.yucc
+endif  HAVE_ASM_COROUTINES
 
 bin_PROGRAMS += lines
 BUILT_SOURCES += lines.yucc

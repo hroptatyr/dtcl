@@ -1,0 +1,11 @@
+Usage: dtmerge FILE1 FILE2 FORMULA
+
+Merge lines of FILE1 and FILE2.
+FORMULA is C [+ C]... with C being a named columns or
+a column index, or if different in both files the special
+form Cl=Cr, meaning column Cl in the left file is joined
+with column Cr in the right file.
+
+  -H, --header          Header is present in FILE
+  --col-names           Output column names.
+  --all[=?]             Print outer join, or (l)eft or (r)ight join.

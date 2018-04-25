@@ -23,7 +23,7 @@ AC_COPYRIGHT([dnl
 ###     autoreconf
 ])
 
-AM_INIT_AUTOMAKE([foreign parallel-tests dist-xz color-tests])
+AM_INIT_AUTOMAKE([foreign parallel-tests dist-xz color-tests subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 AX_YUCK_SCMVER([version.mk])
@@ -35,10 +35,14 @@ SXE_CHECK_CC([c11 c1x c99 gnu99])
 SXE_CHECK_CFLAGS
 AC_CHECK_TOOLS([AR], [xiar ar], [false])
 AC_C_BIGENDIAN
+AC_PROG_RANLIB
 
 ## check if yuck is globally available
 AX_CHECK_YUCK
 AX_CHECK_CLITORIS
+
+SXE_CHECK_ASM_CORUS
+AM_CONDITIONAL([HAVE_ASM_COROUTINES], [test "${use_asm_corus}" = "yes"])
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([build-aux/Makefile])
