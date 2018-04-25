@@ -522,6 +522,7 @@ proc(FILE *fpx, FILE *fpy)
 		if (sx > 0 && sy > 0) {
 			int c = strcmp(bx.dln, by.dln);
 
+		redo:
 			if (0) {
 				;
 			} else if (c < 0) {
@@ -529,23 +530,25 @@ proc(FILE *fpx, FILE *fpy)
 				do {
 					prnt(&bx, NULL);
 				} while ((sx = NEXT1(px, &bx)) > 0 &&
-					 strcmp(bx.dln, by.dln) < 0);
+					 (c = strcmp(bx.dln, by.dln)) < 0);
 				if (sx <= 0) {
 					/* short circuit to by
 					 * sy was guaranteed to be > 0 */
 					goto rest_y;
 				}
+				goto redo;
 			} else if (c > 0) {
 				/* bx first, then by */
 				do {
 					prnt(NULL, &by);
 				} while ((sy = NEXT1(py, &by)) > 0 &&
-					 strcmp(bx.dln, by.dln) > 0);
+					 (c = strcmp(bx.dln, by.dln)) > 0);
 				if (sy <= 0) {
 					/* short-circuit to bx
 					 * sx was guaranteed to be > 0 */
 					goto rest_x;
 				}
+				goto redo;
 			} else {
 				/* keys are equal do a col-by-col comparison */
 				prnt(&bx, &by);
