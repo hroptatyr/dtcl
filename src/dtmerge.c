@@ -628,9 +628,6 @@ Error: cannot open `%s' for reading", argi->args[1U]);
 			*argi->all_arg == 'y';
 	}
 
-	/* get the coroutines going */
-	initialise_cocore();
-
 	/* prealloc some header space */
 	if (UNLIKELY((hdr = malloc(zhdr = 256U)) == NULL)) {
 		error("\
@@ -640,6 +637,9 @@ Error: cannot allocate space for header");
 	}
 	/* start with a framing character */
 	hdr[nhdr++] = '\t';
+
+	/* get the coroutines going */
+	initialise_cocore();
 
 	rc = proc(fpx, fpy) < 0;
 
