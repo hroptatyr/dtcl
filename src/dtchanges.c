@@ -48,20 +48,16 @@
 
 struct hs_s {
 	size_t n;
-	union {
-		size_t v;
-		size_t *p;
-	};
+	size_t *p;
 };
-
 
 static int hdrp = 0;
 static int cnmp = 0;
 static const char *form;
 
 /* join columns in left and right file */
-static struct hs_s jc[2U] = {{0, -1}, {0, -1}};
-static struct hs_s vc[2U] = {{0, -1}, {0, -1}};
+static struct hs_s jc[2U] = {{0, NULL}, {0, NULL}};
+static struct hs_s vc[2U] = {{0, NULL}, {0, NULL}};
 #define L	0U
 #define R	1U
 
@@ -111,43 +107,29 @@ eatws(const char *s)
 static int
 chck(struct hs_s *tg, const struct hs_s *sr, size_t ncol)
 {
-	if (!sr->n) {
-		if (UNLIKELY(sr->v >= ncol)) {
-			return -1;
-		}
-	} else for (size_t i = 0U; i < sr->n; i++) {
+	for (size_t i = 0U; i < sr->n; i++) {
 		if (UNLIKELY(sr->p[i] >= ncol)) {
 			return -1;
 		}
 	}
 
 	/* construct value side, quick bubble sort */
-	with (const size_t nv = ncol - sr->n - !sr->n) {
+	with (const size_t nv = ncol - sr->n) {
 		if (!nv) {
 			break;
 		}
 
 		tg->p = malloc(nv * sizeof(*tg->p));
 		tg->n = nv;
-		if (!sr->n) {
-			size_t k = 0U;
-			for (size_t i = 0U; i < sr->v; i++) {
-				tg->p[k++] = i;
-			}
-			for (size_t i = sr->v + 1U; i < ncol; i++) {
-				tg->p[k++] = i;
-			}
-		} else {
-			for (size_t i = 0U, k = 0U; i < ncol; i++) {
-				for (size_t j = 0U; j < sr->n; j++) {
-					if (sr->p[j] == i) {
-						goto next;
-					}
+		for (size_t i = 0U, k = 0U; i < ncol; i++) {
+			for (size_t j = 0U; j < sr->n; j++) {
+				if (sr->p[j] == i) {
+					goto next;
 				}
-				tg->p[k++] = i;
-			next:
-				continue;
 			}
+			tg->p[k++] = i;
+		next:
+			continue;
 		}
 	}
 	return 0;
@@ -213,18 +195,13 @@ hdrs(const struct hs_s *x, const char *ln, const size_t *of)
 	nperm = 0U;
 
 	if (of) {
-		size_t c, i = 0U;
 
-		if (!x->n) {
-			c = x->v;
-			goto ons;
-		} else for (; i < x->n; i++) {
+		for (size_t i = 0U; i < x->n; i++) {
+			const size_t c = x->p[i];
 			const char *s;
 			size_t n;
 			ssize_t k;
 
-			c = x->p[i];
-		ons:
 			s = ln + of[c];
 			n = of[c + 1U] - of[c + 0U] - 1U;
 			k = addhdr(s, n);
@@ -235,22 +212,16 @@ hdrs(const struct hs_s *x, const char *ln, const size_t *of)
 			adperm(c, k);
 		}
 	} else {
-		size_t c, i = 0U;
-
-		if (!x->n) {
-			c = x->v;
-			goto onc;
-		} else for (; i < x->n; i++) {
+		for (size_t i = 0U; i < x->n; i++) {
+			const size_t c = x->p[i];
 			int m;
 
-			c = x->p[i];
-		onc:
 			m = snprintf(hdr + nhdr, zhdr - nhdr, "V%zu", c + 1U);
 			if (UNLIKELY(nhdr + m + 2U >= zhdr)) {
 				zhdr *= 2U;
 				hdr = realloc(hdr, zhdr * sizeof(*hdr));
 				/* reprint */
-				snprintf(hdr + nhdr, zhdr - nhdr, "V%zu", ++c);
+				snprintf(hdr + nhdr, zhdr - nhdr, "V%zu", c + 1U);
 			}
 			nhdr += m;
 			hdr[nhdr++] = '\t';
@@ -327,13 +298,7 @@ snrf(struct hs_s *restrict tg, const char *hn, const size_t *of, size_t nc, size
 
 	for (nj = 0U, on = j; (on = memchr(on, '+', elhs - on)); nj++, on++);
 
-	if (nj) {
-		tg->p = calloc(tg->n = nj + 1U, sizeof(*tg->p));
-	} else {
-		tg->v = -1;
-		tg->n = 0U;
-		goto one_j;
-	}
+	tg->p = calloc(tg->n = nj + 1U, sizeof(*tg->p));
 	/* now try and snarf the whole shebang */
 	for (nj = 0U; nj < tg->n; nj++, j = on + 1U) {
 		const char *om;
@@ -341,7 +306,6 @@ snrf(struct hs_s *restrict tg, const char *hn, const size_t *of, size_t nc, size
 		long unsigned int x;
 		size_t k;
 
-	one_j:
 		on = memchrnul(j, '+', ej - j);
 		k = 0U;
 		do {
@@ -355,19 +319,13 @@ snrf(struct hs_s *restrict tg, const char *hn, const size_t *of, size_t nc, size
 			;
 		} else {
 			/* retry next time */
-			if (tg->v + 1U) {
-				free(tg->p);
-			}
-			tg->v = -1;
+			free(tg->p);
+			tg->p = NULL;
 			tg->n = 0U;
 			return -1;
 		}
 
-		if (!tg->n) {
-			tg->v = x;
-		} else {
-			tg->p[nj] = x;
-		}
+		tg->p[nj] = x;
 	}
 	return 0;
 }
@@ -468,7 +426,7 @@ Error: cannot allocate memory to hold a copy of the header");
 	}
 
 	while ((b.nrd = getline(&b.line, &llen, fp)) > 0) {
-		size_t bo, eo, i;
+		size_t bo, eo;
 	tok:
 		b.nr++;
 		size_t nf = tokln1(b.coff, b.ncol, b.line, b.nrd);
@@ -482,15 +440,10 @@ Error: line %zu has only %zu columns, expected %zu", b.nr, nf, b.ncol);
 
 		/* construct constant dimension prefix */
 		b.ndln = 0U;
-		i = 0U;
-		if (!jc[fibre].n) {
-			bo = b.coff[jc[fibre].v + 0U];
-			eo = b.coff[jc[fibre].v + 1U];
-			goto one_l;
-		} else for (; i < jc[L].n; i++) {
+		for (size_t i = 0U; i < jc[L].n; i++) {
 			bo = b.coff[jc[fibre].p[i] + 0U];
 			eo = b.coff[jc[fibre].p[i] + 1U];
-		one_l:
+
 			if (UNLIKELY(b.ndln + eo - bo > zdln)) {
 				/* resize */
 				while ((zdln = (zdln * 2U) ?: 256U) <=
