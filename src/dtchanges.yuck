@@ -1,0 +1,8 @@
+Usage: dtchanges FILE1 FILE2 FORMULA
+
+Outline changes of lines in FILE1 and FILE2.
+FORMULA is LHS [~ RHS] with LHS being the join columns and
+RHS being additonally selected columns.
+
+  -H, --header          Header is present in FILE
+  --col-names           Output column names.

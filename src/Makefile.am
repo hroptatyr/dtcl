@@ -51,6 +51,10 @@ if HAVE_ASM_COROUTINES
 bin_PROGRAMS += dtmerge
 dtmerge_LDADD = libcoru.a
 BUILT_SOURCES += dtmerge.yucc
+
+bin_PROGRAMS += dtchanges
+dtchanges_LDADD = libcoru.a
+BUILT_SOURCES += dtchanges.yucc
 endif  HAVE_ASM_COROUTINES
 
 bin_PROGRAMS += lines
