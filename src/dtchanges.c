@@ -58,6 +58,7 @@ static const char *form;
 /* join columns in left and right file */
 static struct hs_s jc[2U] = {{0, NULL}, {0, NULL}};
 static struct hs_s vc[2U] = {{0, NULL}, {0, NULL}};
+static struct hs_s pr[2U] = {{0, NULL}, {0, NULL}};
 #define L	0U
 #define R	1U
 
@@ -68,9 +69,6 @@ size_t zhdr;
 size_t *hof;
 size_t nhof;
 size_t zhof;
-size_t *perm;
-size_t nperm;
-size_t zperm;
 
 
 static void
@@ -101,6 +99,12 @@ eatws(const char *s)
 {
 	for (; (unsigned char)(*s - 1) < ' '; s++);
 	return s;
+}
+
+static inline unsigned int
+streqp(const char *x, size_t m, const char *y, size_t n)
+{
+	return m == n && !memcmp(x, y, n);
 }
 
 
@@ -174,28 +178,18 @@ addhdr(const char *s, size_t n)
 	return nhof - 1;
 }
 
-static void
-adperm(size_t i, size_t j)
-{
-	if (UNLIKELY(j > zperm)) {
-		zperm *= 2U;
-		perm = realloc(perm, zperm * sizeof(*perm));
-	}
-	perm[j] = i + 1U;
-	nperm = nperm > j ? nperm : j ;
-	return;
-}
-
 static int
-hdrs(const struct hs_s *x, const char *ln, const size_t *of)
+hdrs(struct hs_s *restrict tg,
+     const struct hs_s *x, const char *ln, const size_t *of, size_t nc)
 {
-	/* since only the last permutation is relevant, reset perm before use
-	 * 0 can be used as NA marker because we need at least 1 join column */
-	memset(perm, 0, zperm * sizeof(*perm));
-	nperm = 0U;
+	size_t *perm = NULL;
+
+	if (tg) {
+		tg->n = nc;
+		perm = tg->p = calloc(nc, sizeof(*tg->p));
+	}
 
 	if (of) {
-
 		for (size_t i = 0U; i < x->n; i++) {
 			const size_t c = x->p[i];
 			const char *s;
@@ -209,7 +203,9 @@ hdrs(const struct hs_s *x, const char *ln, const size_t *of)
 			if (UNLIKELY(k < 0)) {
 				return -1;
 			} 
-			adperm(c, k);
+			if (perm) {
+				perm[c] = k;
+			}
 		}
 	} else {
 		for (size_t i = 0U; i < x->n; i++) {
@@ -225,9 +221,25 @@ hdrs(const struct hs_s *x, const char *ln, const size_t *of)
 			}
 			nhdr += m;
 			hdr[nhdr++] = '\t';
-			adperm(i, c);
+			if (perm) {
+				perm[i] = c;
+			}
 		}
 	}
+	return 0;
+}
+
+static int
+invperm(struct hs_s *x)
+{
+	size_t *invp = malloc(nhof * sizeof(*invp));
+
+	memset(invp, -1, nhof * sizeof(*invp));
+	for (size_t i = 0U; i < x->n; i++) {
+		invp[x->p[i]] = i;
+	}
+	free(x->p);
+	x->p = invp;
 	return 0;
 }
 
@@ -406,14 +418,13 @@ Error: fewer columns present than needed for formula");
 		const char *ln = hdrp ? b.line : NULL;
 		size_t *of = hdrp ? b.coff : NULL;
 
-		if (!fibre && UNLIKELY(hdrs(jc, ln, of) < 0)) {
+		if (!fibre && UNLIKELY(hdrs(NULL, jc, ln, of, 0U) < 0)) {
 			error("\
 Error: cannot allocate memory to hold a copy of the header");
 			rc = -1;
 			goto out;
 		}
-		memset(perm, -1, sizeof(perm));
-		if (UNLIKELY(hdrs(&vc[fibre], ln, of) < 0)) {
+		if (UNLIKELY(hdrs(&pr[fibre], &vc[fibre], ln, of, b.ncol) < 0)) {
 			error("\
 Error: cannot allocate memory to hold a copy of the header");
 			rc = -1;
@@ -470,6 +481,9 @@ out:
 	if (vc[fibre].n) {
 		free(vc[fibre].p);
 	}
+	if (pr[fibre].n) {
+		free(pr[fibre].p);
+	}
 	free(b.coff);
 	free(b.dln);
 	free(b.line);
@@ -479,28 +493,75 @@ out:
 static void
 prnt(const struct beef_s *x, const struct beef_s *y)
 {
-	static const char tabs[] = "\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t";
-
 	if (x && y) {
-		fwrite(y->dln, 1, y->ndln, stdout);
-	} else if (x) {
-		fwrite(x->dln, 1, x->ndln, stdout);
-	} else if (y) {
-		fwrite(y->dln, 1, y->ndln, stdout);
-	} else {
+		/* compare cols
+		 * "" ~ "SOMETHING" -> "+SOMETHING"
+		 * "SOMETHING" ~ "" -> "-SOMETHING"
+		 * "SOME" ~ "THING" -> "SOME => THING" */
+		uint_fast8_t z[nhof];
+		memset(z, 0, sizeof(z));
+		for (size_t i = jc->n; i < nhof; i++) {
+			size_t cl = pr[L].p[i];
+			size_t cr = pr[R].p[i];
+#define na(z, w)	(w > (z)->ncol || (z)->coff[w] + 1U == (z)->coff[w + 1])
+#define eq(l, r)	streqp(x->line + x->coff[l],			\
+			       x->coff[l + 1] - (x->coff[l] + 1),	\
+			       y->line + y->coff[r],			\
+			       y->coff[r + 1] - (y->coff[r] + 1))
+			uint_fast8_t s = (uint8_t)(na(x, cl) << 1U ^ na(y, cr));
+			uint_fast8_t t = (uint8_t)(!s && !eq(cl, cr));
+
+			z[i] = (uint_fast8_t)(s ^ t ^ t << 1U);
+		}
+		for (size_t j = 0U; j < countof(z); j++) {
+			if (z[j]) {
+				goto pr;
+			}
+		}
 		return;
-	}
-	if (x) {
+	pr:
+		fputc(' ', stdout);
+		fwrite(y->dln, 1, y->ndln, stdout);
+		for (size_t i = jc->n; i < nhof; i++) {
+			fputc('\t', stdout);
+			switch (z[i]) {
+			case 0U:
+			default:
+				continue;
+			case 1U:
+				fputc('-', stdout);
+				prnc(x->line, x->coff, pr[L].p[i]);
+				continue;
+			case 2U:
+				fputc('+', stdout);
+				prnc(y->line, y->coff, pr[R].p[i]);
+				continue;
+			case 3U:
+				break;
+			}
+			prnc(x->line, x->coff, pr[L].p[i]);
+			fwrite(" => ", 1, 4U, stdout);
+			prnc(y->line, y->coff, pr[R].p[i]);
+		}
+	} else if (x) {
+		fputc('-', stdout);
+		fwrite(x->dln, 1, x->ndln, stdout);
 		for (size_t i = 0U; i < vc[L].n; i++) {
 			fputc('\t', stdout);
 			prnc(x->line, x->coff, vc[L].p[i]);
 		}
-	}
-	if (y) {
+		for (size_t i = vc[L].n; i < x->ncol; i++) {
+			fputc('\t', stdout);
+		}
+	} else if (y) {
+		fputc('+', stdout);
+		fwrite(y->dln, 1, y->ndln, stdout);
 		for (size_t i = 0U; i < vc[R].n; i++) {
 			fputc('\t', stdout);
 			prnc(y->line, y->coff, vc[R].p[i]);
 		}
+	} else {
+		return;
 	}
 	fputc('\n', stdout);
 	return;
@@ -524,6 +585,11 @@ proc(FILE *fpx, FILE *fpy)
 	if (cnmp && sx > 0 && sy > 0) {
 		hdr[nhdr - 1U] = '\n';
 		fwrite(hdr + 1U, sizeof(*hdr), nhdr - 1U, stdout);
+	}
+
+	if (sx > 0 && sy > 0) {
+		invperm(&pr[L]);
+		invperm(&pr[R]);
 	}
 
 	for (int c; sx > 0 || sy > 0;
@@ -634,13 +700,6 @@ Error: cannot allocate space for header");
 		rc = 1;
 		goto out;
 	}
-	/* looks from the unified header into the files */
-	if (UNLIKELY((perm = malloc((zperm = 32U) * sizeof(*perm))) == NULL)) {
-		error("\
-Error: cannot allocate space for header permutation");
-		rc = 1;
-		goto out;
-	}
 
 	/* get the coroutines going */
 	initialise_cocore();
@@ -648,6 +707,7 @@ Error: cannot allocate space for header permutation");
 	rc = proc(fpx, fpy) < 0;
 
 	free(hdr);
+	free(hof);
 
 clo:
 	if (fpx) {
