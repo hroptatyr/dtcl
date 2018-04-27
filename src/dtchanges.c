@@ -57,6 +57,7 @@ static const char *form;
 
 /* join columns in left and right file */
 static struct hs_s jc[2U] = {{0, NULL}, {0, NULL}};
+static struct hs_s xc[2U] = {{0, NULL}, {0, NULL}};
 static struct hs_s vc[2U] = {{0, NULL}, {0, NULL}};
 static struct hs_s pr[2U] = {{0, NULL}, {0, NULL}};
 #define L	0U
@@ -109,16 +110,24 @@ streqp(const char *x, size_t m, const char *y, size_t n)
 
 
 static int
-chck(struct hs_s *tg, const struct hs_s *sr, size_t ncol)
+chck(struct hs_s *tg, const struct hs_s *sj, const struct hs_s *sx, size_t ncol)
 {
-	for (size_t i = 0U; i < sr->n; i++) {
-		if (UNLIKELY(sr->p[i] >= ncol)) {
+	for (size_t i = 0U; i < sj->n; i++) {
+		if (UNLIKELY(sj->p[i] >= ncol)) {
 			return -1;
 		}
 	}
+	for (size_t i = 0U; i < sx->n; i++) {
+		if (UNLIKELY(sx->p[i] >= ncol)) {
+			return -1;
+		}
+	}
+	if (UNLIKELY(sj->n + sx->n > ncol)) {
+		return -1;
+	}
 
 	/* construct value side, quick bubble sort */
-	with (const size_t nv = ncol - sr->n) {
+	with (const size_t nv = ncol - sj->n - sx->n) {
 		if (!nv) {
 			break;
 		}
@@ -126,8 +135,13 @@ chck(struct hs_s *tg, const struct hs_s *sr, size_t ncol)
 		tg->p = malloc(nv * sizeof(*tg->p));
 		tg->n = nv;
 		for (size_t i = 0U, k = 0U; i < ncol; i++) {
-			for (size_t j = 0U; j < sr->n; j++) {
-				if (sr->p[j] == i) {
+			for (size_t j = 0U; j < sj->n; j++) {
+				if (sj->p[j] == i) {
+					goto next;
+				}
+			}
+			for (size_t j = 0U; j < sx->n; j++) {
+				if (sx->p[j] == i) {
 					goto next;
 				}
 			}
@@ -295,20 +309,28 @@ find_s(const char *ss, const size_t *of, size_t nc, const char *s, size_t z)
 }
 
 static int
-snrf(struct hs_s *restrict tg, const char *hn, const size_t *of, size_t nc, size_t i)
+snrf(struct hs_s *restrict tg,
+     const char *hn, const size_t *of, size_t nc, size_t i, size_t m)
 {
-/* snarf FORM (global) into temporary TG based on header line HN and header OF
-   over NC columns, I-th file, i.e. skip I = tokens in formula */
+/* snarf m-th side of FORM (global) into temporary TG based on header line
+   HN and header OF over NC columns, I-th file, i.e. skip I `=' tokens
+   in formula */
 	const char *ej, *j;
-	const char *elhs, *erhs;
 	const char *on;
 	size_t nj;
 
 	j = form;
-	erhs = ej = j + strlen(j);
-	elhs = ej = memchrnul(j, '~', ej - j);
+	ej = j + strlen(j);
 
-	for (nj = 0U, on = j; (on = memchr(on, '+', elhs - on)); nj++, on++);
+	for (size_t k = 0U; j < ej && k < m;
+	     k++, j = memchrnul(j, '~', ej - j) + 1U);
+	if (j >= ej) {
+		return !!m - 1;
+	}
+	/* set end of snarf string accordingly */
+	ej = memchrnul(j, '~', ej - j);
+
+	for (nj = 0U, on = j; (on = memchr(on, '+', ej - on)); nj++, on++);
 
 	tg->p = calloc(tg->n = nj + 1U, sizeof(*tg->p));
 	/* now try and snarf the whole shebang */
@@ -401,12 +423,17 @@ Error: cannot allocate memory to hold one line");
 	tokln1(b.coff, b.ncol, b.line, b.nrd);
 
 	/* we might need to rescan the formula now */
-	if (UNLIKELY(snrf(&jc[fibre], b.line, b.coff, b.ncol, fibre)) < 0) {
+	if (UNLIKELY(snrf(&jc[fibre], b.line, b.coff, b.ncol, fibre, 0U)) < 0) {
 		error("\
 Error: cannot interpret formula");
 		rc = -1;
 		goto out;
-	} else if (UNLIKELY(chck(&vc[fibre], &jc[fibre], b.ncol) < 0)) {
+	} else if (UNLIKELY(snrf(&xc[fibre], b.line, b.coff, b.ncol, fibre, 1U)) < 0) {
+		error("\
+Error: cannot interpret formula");
+		rc = -1;
+		goto out;
+	} else if (UNLIKELY(chck(&vc[fibre], &jc[fibre], &xc[fibre], b.ncol) < 0)) {
 		errno = 0, error("\
 Error: fewer columns present than needed for formula");
 		rc = -1;
@@ -477,6 +504,9 @@ Error: line %zu has only %zu columns, expected %zu", b.nr, nf, b.ncol);
 out:
 	if (jc[fibre].n) {
 		free(jc[fibre].p);
+	}
+	if (xc[fibre].n) {
+		free(xc[fibre].p);
 	}
 	if (vc[fibre].n) {
 		free(vc[fibre].p);
