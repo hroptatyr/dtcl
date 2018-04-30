@@ -369,9 +369,11 @@ snrf(struct hs_s *restrict tg,
 static void
 prnc(const char *base, const size_t *cols, size_t i)
 {
-	const size_t bo = cols[i + 0U];
-	const size_t eo = cols[i + 1U];
-	fwrite(base + bo, sizeof(*base), eo - bo - 1U, stdout);
+	if (LIKELY(i < nhof)) {
+		const size_t bo = cols[i + 0U];
+		const size_t eo = cols[i + 1U];
+		fwrite(base + bo, sizeof(*base), eo - bo - 1U, stdout);
+	}
 	return;
 }
 
@@ -588,27 +590,16 @@ prnt(const struct beef_s *x, const struct beef_s *y)
 	} else if (x) {
 		fputc('-', stdout);
 		fwrite(x->dln, 1, x->ndln, stdout);
-		for (size_t i = 0U; i < xc[L].n; i++) {
+		for (size_t i = jc[L].n; i < nhof; i++) {
 			fputc('\t', stdout);
-			prnc(x->line, x->coff, xc[L].c[i]);
-		}
-		for (size_t i = 0U; i < vc[L].n; i++) {
-			fputc('\t', stdout);
-			prnc(x->line, x->coff, vc[L].c[i]);
-		}
-		for (size_t i = vc[L].n; i < x->ncol; i++) {
-			fputc('\t', stdout);
+			prnc(x->line, x->coff, vc[L].p[i]);
 		}
 	} else if (y) {
 		fputc('+', stdout);
 		fwrite(y->dln, 1, y->ndln, stdout);
-		for (size_t i = 0U; i < xc[R].n; i++) {
+		for (size_t i = jc[R].n; i < nhof; i++) {
 			fputc('\t', stdout);
-			prnc(y->line, y->coff, xc[R].c[i]);
-		}
-		for (size_t i = 0U; i < vc[R].n; i++) {
-			fputc('\t', stdout);
-			prnc(y->line, y->coff, vc[R].c[i]);
+			prnc(y->line, y->coff, vc[R].p[i]);
 		}
 	} else {
 		return;
