@@ -548,7 +548,11 @@ prnt(const struct beef_s *x, const struct beef_s *y)
 			       y->coff[r + 1] - (y->coff[r] + 1))
 			uint_fast8_t s = (uint8_t)(na(x, cl) << 1U ^ na(y, cr));
 			uint_fast8_t t = (uint8_t)(!s && !eq(cl, cr));
+			/* two NAs is not considered a change */
+			uint_fast8_t u = (uint8_t)(s & 0b1U ^ (s >> 1U) & 0b1U);
 
+			/* massage s */
+			s &= (uint_fast8_t)(u ^ u << 1U);
 			z[i] = (uint_fast8_t)(s ^ t ^ t << 1U);
 		}
 		for (size_t j = jc->n + xc->n; j < countof(z); j++) {
