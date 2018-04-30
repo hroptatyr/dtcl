@@ -1,0 +1,7 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ dtchanges -H "${srcdir}/changes_03.csv" "${srcdir}/changes_01.csv" '4=6~1'
+ BBG001S50HF1	2018-04-13 => 2018-04-10		-AUD				
++BBG00HMNRYB1	2018-04-10	1997 HK Equity	HKD	BBG00J76TKS1	XHKG	KYG9593A1040	Wharf Real Estate Investment Co Ltd
+-BBG111222333	2018-04-13	PORN Equity	BLA	BBG111111111	BLA	BLA	Bla Ltd
+$
