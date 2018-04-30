@@ -108,12 +108,6 @@ streqp(const char *x, size_t m, const char *y, size_t n)
 	return m == n && !memcmp(x, y, n);
 }
 
-static inline __attribute__((pure, const)) size_t
-max_z(size_t z1, size_t z2)
-{
-	return z1 < z2 ? z2 : z1;
-}
-
 
 static int
 chck(struct hs_s *tg, const struct hs_s *sj, const struct hs_s *sx, size_t ncol)
@@ -221,24 +215,26 @@ hdrs(struct hs_s *restrict x, const char *ln, const size_t *of, size_t nc)
 
 			if (UNLIKELY(k < 0)) {
 				return -1;
-			} 
+			}
 			x->p[c] = k;
 		}
 	} else {
+		char tmp[32U];
 		for (size_t i = 0U; i < x->n; i++) {
 			const size_t c = x->c[i];
+			ssize_t k;
 			int m;
 
-			m = snprintf(hdr + nhdr, zhdr - nhdr, "V%zu", c + 1U);
-			if (UNLIKELY(nhdr + m + 2U >= zhdr)) {
-				zhdr *= 2U;
-				hdr = realloc(hdr, zhdr * sizeof(*hdr));
-				/* reprint */
-				snprintf(hdr + nhdr, zhdr - nhdr, "V%zu", c + 1U);
+			m = snprintf(tmp, sizeof(tmp), "V%zu", c + 1U);
+			if (UNLIKELY(m < 0)) {
+				return -1;
 			}
-			nhdr += m;
-			hdr[nhdr++] = '\t';
-			x->p[c] = i;
+			k = addhdr(tmp, m);
+
+			if (UNLIKELY(k < 0)) {
+				return -1;
+			}
+			x->p[c] = k;
 		}
 	}
 	return 0;
@@ -476,7 +472,6 @@ Error: cannot allocate memory to hold a copy of the header");
 	}
 
 	if (!hdrp) {
-		nhof = jc->n + xc->n + max_z(vc[L].n, vc[R].n);
 		goto tok;
 	}
 
