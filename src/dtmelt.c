@@ -140,13 +140,13 @@ chck(size_t ncol)
 static void
 phdr(const char *hdrs, const size_t *hoff, size_t nxph)
 {
-	size_t i;
+	size_t i, j = 0U;
 
 	if (!nlhs) {
 		i = lhs.v;
 		goto onh;
 	}
-	for (size_t j = 0U; j < nlhs; j++) {
+	for (; j < nlhs; j++) {
 		i = lhs.p[j];
 	onh:;
 		const size_t of = hoff[i + 0U];
