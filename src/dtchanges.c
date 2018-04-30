@@ -108,6 +108,12 @@ streqp(const char *x, size_t m, const char *y, size_t n)
 	return m == n && !memcmp(x, y, n);
 }
 
+static inline __attribute__((pure, const)) size_t
+max_z(size_t z1, size_t z2)
+{
+	return z1 < z2 ? z2 : z1;
+}
+
 
 static int
 chck(struct hs_s *tg, const struct hs_s *sj, const struct hs_s *sx, size_t ncol)
@@ -470,6 +476,7 @@ Error: cannot allocate memory to hold a copy of the header");
 	}
 
 	if (!hdrp) {
+		nhof = jc->n + xc->n + max_z(vc[L].n, vc[R].n);
 		goto tok;
 	}
 
