@@ -156,7 +156,7 @@ phdr(const char *hdrs, const size_t *hoff, size_t nxph)
 	}
 	if (nxph <= 1U) {
 		fputs("variable\t", stdout);
-	} else for (size_t j = 0U; j < nxph; j++) {
+	} else for (j = 0U; j < nxph; j++) {
 		fprintf(stdout, "variable%zu", j + 1U);
 		fputc('\t', stdout);
 	}
@@ -463,7 +463,7 @@ Error: product headers must have same number of factors");
 	}
 
 	while ((nrd = getline(&line, &llen, stdin)) > 0) {
-		size_t bo, eo, v;
+		size_t bo, eo, v, i;
 	tok:
 		nr++;
 		size_t nf = tokln1(coff, ncol, line, nrd);
@@ -476,12 +476,13 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 		}
 
 		/* construct constant dimension prefix */
+		i = 0U;
 		ndln = 0U;
 		if (!nlhs) {
 			bo = coff[lhs.v + 0U];
 			eo = coff[lhs.v + 1U];
 			goto one_l;
-		} else for (size_t i = 0U; i < nlhs; i++) {
+		} else for (; i < nlhs; i++) {
 			bo = coff[lhs.p[i] + 0U];
 			eo = coff[lhs.p[i] + 1U];
 		one_l:
@@ -496,12 +497,13 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 			dln[ndln++] = '\t';
 		}
 
+		i = 0U;
 		if (!nrhs) {
 			bo = coff[rhs.v + 0U];
 			eo = coff[rhs.v + 1U];
 			v = rhs.v;
 			goto one_r;
-		} else for (size_t i = 0U; i < nrhs; i++) {
+		} else for (; i < nrhs; i++) {
 			bo = coff[rhs.p[i] + 0U];
 			eo = coff[rhs.p[i] + 1U];
 			v = rhs.p[i];
