@@ -1,6 +1,6 @@
 #!/usr/bin/clitoris  ## -*- shell-script -*-
 
-$ tail -n +2  "${srcdir}/molten_02.csv" | sort -t$'\t' -k1,1 -k2,2 -k4,4 | dtcast '1+2+4~3' --col-names
+$ tail -n +2  "${srcdir}/molten_02.csv" | sort -t'	' -k1,1 -k2,2 -k4,4 | dtcast '1+2+4~3' --col-names
 V1	V2	V4	close	high	low	open
 2009-03-12	AX	XETR	718.42	718.47	717.24	717.24
 2009-03-12	AX	XFRA	718.42	718.48	717.25	717.25
