@@ -99,4 +99,18 @@ EXTRA_DIST += merge_04.csv
 EXTRA_DIST += merge_05.csv
 EXTRA_DIST += merge_06.csv
 
+if HAVE_ASM_COROUTINES
+TESTS += dtchanges_01.clit
+TESTS += dtchanges_02.clit
+TESTS += dtchanges_03.clit
+TESTS += dtchanges_04.clit
+TESTS += dtchanges_05.clit
+TESTS += dtchanges_06.clit
+TESTS += dtchanges_07.clit
+TESTS += dtchanges_08.clit
+endif  HAVE_ASM_COROUTINES
+EXTRA_DIST += changes_01.csv
+EXTRA_DIST += changes_02.csv
+EXTRA_DIST += changes_03.csv
+
 ## Makefile.am ends here
