@@ -21,6 +21,17 @@ branches:
   only:
     - master
     - next
+    - /^v\d+\..*/
+
+deploy:
+  provider: releases
+  api_key:
+    secure: "1SgD+3Wi8GfmQ5srkiIno1a6B3bgxP3Jq2Y2HxeC9Tmv2SqzIwcnZu19uj6H7HFR4mREDaEzQEsFLs6lZJBg1lMDVvKY7mWExm3szxowPTi9S0SkoveB1G9K7+rVDJH8+LXzI9daLw6iDQqFLVA/KNJVqSuDpof5QxaXXDBc4NBlzU5tXPa1szBihJpiKAr8ChG77SxKNwT+V1m895RDgBfklnqu/0UgtkE+wRvLe/il+/QOLfT5CLsQw/vXwoiLJAZkxbVEEECISHftI0MvBisWS1/20MnCYC0QioQg2116COvLg0QsPiTIeSogGtLkC0DvJqw45GZsolLfpdUVzh1T28nd1piIp3nYFi5VuXqLLhzNcWkRpYeRlBcQ2FZaziRms6F4zE6F4J9R8MX8UD3XJiFFUZeglv8CD03TPSU75cfv/wDYzKxHu5iLsn0Wt2p9BvnnIJzpk+M33w2j/lJdLJY+Fmgpi37OshI/oT5x5g7QIg2dP0UoUagrjPUarnyoUB6u6EDJKw5Q7j9eWyckpcBlhmAGkk0dWNEm9anlU23yCkE/GLOvJWhkpjUmpkG3EVKoiwNu5LgdRdupggZuN0embJiOlokjOJ9BDRl7UKxmopq5qEoT240JiiBWWpvW9zaZlq5q6Md10yP0R2dTPa3zDjgLTbN4nyC5EFU="
+  file_glob: true
+  file: dtcl-*.tar.xz
+  skip_cleanup: true
+  on:
+    tags: true
 
 notifications:
   email:
