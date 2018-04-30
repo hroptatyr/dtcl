@@ -538,7 +538,7 @@ prnt(const struct beef_s *x, const struct beef_s *y)
 		 * "SOME" ~ "THING" -> "SOME => THING" */
 		uint_fast8_t z[nhof];
 		memset(z, 0, sizeof(z));
-		for (size_t i = jc->n; i < nhof; i++) {
+		for (size_t i = jc->n; i < countof(z); i++) {
 			size_t cl = vc[L].p[i];
 			size_t cr = vc[R].p[i];
 #define na(z, w)	(w > (z)->ncol || (z)->coff[w] + 1U == (z)->coff[w + 1])
@@ -551,7 +551,7 @@ prnt(const struct beef_s *x, const struct beef_s *y)
 
 			z[i] = (uint_fast8_t)(s ^ t ^ t << 1U);
 		}
-		for (size_t j = 0U; j < countof(z); j++) {
+		for (size_t j = jc->n + xc->n; j < countof(z); j++) {
 			if (z[j]) {
 				goto pr;
 			}
@@ -584,6 +584,10 @@ prnt(const struct beef_s *x, const struct beef_s *y)
 	} else if (x) {
 		fputc('-', stdout);
 		fwrite(x->dln, 1, x->ndln, stdout);
+		for (size_t i = 0U; i < xc[L].n; i++) {
+			fputc('\t', stdout);
+			prnc(x->line, x->coff, xc[L].c[i]);
+		}
 		for (size_t i = 0U; i < vc[L].n; i++) {
 			fputc('\t', stdout);
 			prnc(x->line, x->coff, vc[L].c[i]);
@@ -594,6 +598,10 @@ prnt(const struct beef_s *x, const struct beef_s *y)
 	} else if (y) {
 		fputc('+', stdout);
 		fwrite(y->dln, 1, y->ndln, stdout);
+		for (size_t i = 0U; i < xc[R].n; i++) {
+			fputc('\t', stdout);
+			prnc(y->line, y->coff, xc[R].c[i]);
+		}
 		for (size_t i = 0U; i < vc[R].n; i++) {
 			fputc('\t', stdout);
 			prnc(y->line, y->coff, vc[R].c[i]);
