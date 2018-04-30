@@ -154,11 +154,12 @@ hdrs(const struct hs_s *x, const char *ln, const size_t *restrict of, char hc)
 {
 	if (of) {
 		size_t c;
+		size_t i = 0U;
 
 		if (!x->n) {
 			c = x->v;
 			goto ons;
-		} else for (size_t i = 0U; i < x->n; i++) {
+		} else for (; i < x->n; i++) {
 			const char *s;
 			size_t n;
 
@@ -180,11 +181,12 @@ hdrs(const struct hs_s *x, const char *ln, const size_t *restrict of, char hc)
 		}
 	} else {
 		size_t c;
+		size_t i = 0U;
 
 		if (!x->n) {
 			c = x->v;
 			goto onc;
-		} else for (size_t i = 0U; i < x->n; i++) {
+		} else for (; i < x->n; i++) {
 			int m;
 
 			c = x->p[i];
@@ -413,7 +415,7 @@ Error: cannot allocate memory to hold a copy of the header");
 	}
 
 	while ((b.nrd = getline(&b.line, &llen, fp)) > 0) {
-		size_t bo, eo;
+		size_t bo, eo, i;
 	tok:
 		b.nr++;
 		size_t nf = tokln1(b.coff, b.ncol, b.line, b.nrd);
@@ -427,11 +429,12 @@ Error: line %zu has only %zu columns, expected %zu", b.nr, nf, b.ncol);
 
 		/* construct constant dimension prefix */
 		b.ndln = 0U;
+		i = 0U;
 		if (!jc[fibre].n) {
 			bo = b.coff[jc[fibre].v + 0U];
 			eo = b.coff[jc[fibre].v + 1U];
 			goto one_l;
-		} else for (size_t i = 0U; i < jc[L].n; i++) {
+		} else for (; i < jc[L].n; i++) {
 			bo = b.coff[jc[fibre].p[i] + 0U];
 			eo = b.coff[jc[fibre].p[i] + 1U];
 		one_l:
