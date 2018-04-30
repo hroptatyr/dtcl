@@ -6,17 +6,16 @@ LC_ALL = C
 ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS =
-EXTRA_DIST = $(BUILT_SOURCES)
+EXTRA_DIST = $(DISTCLEANFILES)
 DISTCLEANFILES =
-BUILT_SOURCES =
 
 SUBDIRS += build-aux
 SUBDIRS += src
 SUBDIRS += test
 
 DISTCLEANFILES += version.mk
+DISTCLEANFILES += .version
 EXTRA_DIST += version.mk.in
-BUILT_SOURCES += .version
 
 
 .version:
