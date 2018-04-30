@@ -69,7 +69,7 @@ int
 main(int argc, char *argv[])
 {
 	static yuck_t argi[1U];
-	FILE **fp;
+	FILE **fp = NULL;
 	char *line = NULL;
 	size_t llen = 0U;
 	size_t ln = 0U;
