@@ -54,6 +54,7 @@ struct hs_s {
 
 static int hdrp = 0;
 static int cnmp = 0;
+static int brfp = 0;
 static const char *form;
 
 /* join columns in left and right file */
@@ -805,12 +806,23 @@ summ(FILE *fpx, FILE *fpy)
 	}
 	UNPREP();
 
-	printf("%zu line(s) added\n", nl[ADD]);
-	printf("%zu line(s) removed\n", nl[DEL]);
-	printf("%zu line(s) changed\n", nl[CHG]);
-	printf("  %zu value(s) added\n", nc[ADD]);
-	printf("  %zu value(s) removed\n", nc[DEL]);
-	printf("  %zu value(s) changed\n", nc[CHG]);
+	if (!brfp) {
+		printf("%zu line(s) added\n", nl[ADD]);
+		printf("%zu line(s) removed\n", nl[DEL]);
+		printf("%zu line(s) changed\n", nl[CHG]);
+		printf("  %zu value(s) added\n", nc[ADD]);
+		printf("  %zu value(s) removed\n", nc[DEL]);
+		printf("  %zu value(s) changed\n", nc[CHG]);
+	} else {
+		for (size_t i = 0U; i < NCHGTYP; i++) {
+			fprintf(stdout, "%zu", nl[i]);
+			fputc('\t', stdout);
+		}
+		for (size_t i = 0U; i < NCHGTYP; i++) {
+			fprintf(stdout, "%zu", nc[i]);
+			fputc('\t' + (i == CHG), stdout);
+		}
+	}
 	return rc;
 }
 
@@ -874,9 +886,10 @@ Error: cannot allocate space for header");
 	/* get the coroutines going */
 	initialise_cocore();
 
-	if (!argi->summary_flag) {
+	if (!argi->summary_arg) {
 		rc = proc(fpx, fpy) < 0;
 	} else {
+		brfp = argi->summary_arg != YUCK_OPTARG_NONE;
 		rc = summ(fpx, fpy) < 0;
 	}
 
