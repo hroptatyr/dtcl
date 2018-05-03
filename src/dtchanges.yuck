@@ -6,4 +6,7 @@ RHS being additonally selected columns.
 
   -H, --header          Header is present in FILE
   --col-names           Output column names.
-  -s, --summary         Output summary of changes only.
+  -s, --summary[=brief]  Output summary of changes only, with
+                        qualifier brief for a machine readable
+                        variant: unchanged, removed, added and
+                        changed lines and values.
