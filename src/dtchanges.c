@@ -63,6 +63,14 @@ static struct hs_s vc[2U];
 #define L	0U
 #define R	1U
 
+typedef enum {
+	EQU,
+	DEL,
+	ADD,
+	CHG,
+	NCHGTYP,
+} chgtyp_t;
+
 /* union header */
 char *hdr;
 size_t nhdr;
@@ -687,6 +695,125 @@ proc(FILE *fpx, FILE *fpy)
 	return rc;
 }
 
+static unsigned int
+csum(size_t sum[static NCHGTYP], const struct beef_s *x, const struct beef_s *y)
+{
+	/* compare cols
+	 * "" ~ "SOMETHING" -> "+SOMETHING"
+	 * "SOMETHING" ~ "" -> "-SOMETHING"
+	 * "SOME" ~ "THING" -> "SOME => THING" */
+	uint_fast8_t z[nhof];
+	memset(z, 0, sizeof(z));
+	for (size_t i = jc->n; i < countof(z); i++) {
+		size_t cl = vc[L].p[i];
+		size_t cr = vc[R].p[i];
+#define na(z, w)	(w > (z)->ncol || (z)->coff[w] + 1U == (z)->coff[w + 1])
+#define eq(l, r)	streqp(x->line + x->coff[l],			\
+			       x->coff[l + 1] - (x->coff[l] + 1),	\
+			       y->line + y->coff[r],			\
+			       y->coff[r + 1] - (y->coff[r] + 1))
+		uint_fast8_t s = (uint8_t)(na(x, cl) << 1U ^ na(y, cr));
+		uint_fast8_t t = (uint8_t)(!s && !eq(cl, cr));
+		/* two NAs is not considered a change */
+		uint_fast8_t u = (uint8_t)(s & 0b1U ^ (s >> 1U) & 0b1U);
+
+		/* massage s */
+		s &= (uint_fast8_t)(u ^ u << 1U);
+		z[i] = (uint_fast8_t)(s ^ t ^ t << 1U);
+	}
+	for (size_t j = jc->n + xc->n; j < countof(z); j++) {
+		if (z[j]) {
+			goto pr;
+		}
+	}
+	return EQU;
+pr:
+	for (size_t i = jc->n; i < nhof; i++) {
+		sum[z[i]]++;
+	}
+	return CHG;
+}
+
+static int
+summ(FILE *fpx, FILE *fpy)
+{
+/* coordinator between fpx and fpy */
+	struct cocore *self = PREP();
+	struct cocore *px = START_PACK(co_proc1, .next = self,
+				       .clo = {.fp = fpx, .fibre = 0U});
+	struct cocore *py = START_PACK(co_proc1, .next = self,
+				       .clo = {.fp = fpy, .fibre = 1U});
+	struct beef_s bx;
+	struct beef_s by;
+	int sx = NEXT1(px, &bx);
+	int sy = NEXT1(py, &by);
+	size_t nl[NCHGTYP] = {0U};
+	size_t nc[NCHGTYP] = {0U};
+	int rc = 0;
+
+	if (sx > 0 && sy > 0) {
+		invperm(&vc[L]);
+		invperm(&vc[R]);
+	}
+
+	for (int c; sx > 0 || sy > 0;
+	     sx = NEXT1(px, &bx), sy = NEXT1(py, &by)) {
+		if (sx > 0 && sy > 0) {
+		redo:
+			c = strcmp(bx.dln, by.dln);
+
+			if (0) {
+				;
+			} else if (c < 0) {
+				nl[DEL]++;
+
+				if ((sx = NEXT1(px, &bx)) <= 0) {
+					/* short circuit to by
+					 * sy was guaranteed to be > 0 */
+					goto rest_y;
+				}
+				goto redo;
+			} else if (c > 0) {
+				/* bx first, then by */
+				nl[ADD]++;
+
+				if ((sy = NEXT1(py, &by)) <= 0) {
+					/* short-circuit to bx
+					 * sx was guaranteed to be > 0 */
+					goto rest_x;
+				}
+				goto redo;
+			} else {
+				/* keys are equal do a col-by-col comparison */
+				nl[csum(nc, &bx, &by)]++;
+			}
+		} else if (sx > 0) {
+		rest_x:
+			/* we're out of BYs */
+			do {
+				nl[DEL]++;
+			} while ((sx = NEXT1(px, &bx)) > 0);
+			break;
+		} else if (sy > 0) {
+		rest_y:
+			/* we're out of BXs */
+			do {
+				nl[ADD]++;
+			} while ((sy = NEXT1(py, &by)) > 0);
+			break;
+		}
+	}
+	UNPREP();
+
+	printf("%zu line(s) added\n", nl[ADD]);
+	printf("%zu line(s) removed\n", nl[DEL]);
+	printf("%zu line(s) changed\n", nl[CHG]);
+	printf("  %zu value(s) added\n", nc[ADD]);
+	printf("  %zu value(s) removed\n", nc[DEL]);
+	printf("  %zu value(s) changed\n", nc[CHG]);
+	return rc;
+}
+
 
 #include "dtchanges.yucc"
 
@@ -747,7 +874,11 @@ Error: cannot allocate space for header");
 	/* get the coroutines going */
 	initialise_cocore();
 
-	rc = proc(fpx, fpy) < 0;
+	if (!argi->summary_flag) {
+		rc = proc(fpx, fpy) < 0;
+	} else {
+		rc = summ(fpx, fpy) < 0;
+	}
 
 	free(hdr);
 	free(hof);
