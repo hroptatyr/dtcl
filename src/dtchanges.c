@@ -168,6 +168,8 @@ addhdr(const char *s, size_t n)
 	char pivot;
 
 	if (UNLIKELY(!n)) {
+		errno = 0, error("\
+Error: zero length column name not allowed");
 		return -1;
 	}
 
@@ -236,6 +238,8 @@ hdrs(struct hs_s *restrict x, const char *ln, const size_t *of, size_t nc)
 
 			m = snprintf(tmp, sizeof(tmp), "V%zu", c + 1U);
 			if (UNLIKELY(m < 0)) {
+				errno = 0, error("\
+Error: cannot generate column name");
 				return -1;
 			}
 			k = addhdr(tmp, m);
@@ -461,20 +465,14 @@ Error: fewer columns present than needed for formula");
 		size_t *of = hdrp ? b.coff : NULL;
 
 		if (!fibre && UNLIKELY(hdrs(jc, ln, of, b.ncol) < 0)) {
-			error("\
-Error: cannot allocate memory to hold a copy of the header");
 			rc = -1;
 			goto out;
 		}
 		if (!fibre && UNLIKELY(hdrs(xc, ln, of, b.ncol) < 0)) {
-			error("\
-Error: cannot allocate memory to hold a copy of the header");
 			rc = -1;
 			goto out;
 		}
 		if (UNLIKELY(hdrs(&vc[fibre], ln, of, b.ncol) < 0)) {
-			error("\
-Error: cannot allocate memory to hold a copy of the header");
 			rc = -1;
 			goto out;
 		}
