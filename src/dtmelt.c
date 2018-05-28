@@ -114,6 +114,9 @@ chck(size_t ncol)
 	if (!nrhs && !(rhs.v + 1U)) {
 		/* construct the set of measure vars */
 		nrhs = ncol - nlhs - 1 + (nlhs > 0);
+		if (UNLIKELY(!nrhs)) {
+			return -1;
+		}
 		if (UNLIKELY(!(rhs.p = calloc(nrhs, sizeof(*rhs.p))))) {
 			return -1;
 		} else if (!nlhs) {
