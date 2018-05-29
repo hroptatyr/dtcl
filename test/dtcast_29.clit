@@ -1,0 +1,5 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ head -n 5 "${srcdir}/molten_01.csv" | cut -f 3,4 | dtcast -H '~1'
+.	717.25	718.47	717.25	718.42
+$
