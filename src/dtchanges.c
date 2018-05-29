@@ -512,7 +512,8 @@ Error: line %zu has only %zu columns, expected %zu", b.nr, nf, b.ncol);
 			b.dln[b.ndln++] = '\t';
 		}
 		/* terminate dln */
-		b.dln[--b.ndln] = '\0';
+		b.ndln -= !!jc[L].n;
+		b.dln[b.ndln] = '\0';
 
 		/* prep yield */
 		*(struct beef_s*)arg = b;
