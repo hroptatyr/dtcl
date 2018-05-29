@@ -224,7 +224,7 @@ phdr(const char *hdrs, const size_t *hoff)
 		size_t i;
 		size_t j = 0U;
 
-		if (!nlhs) {
+		if (!nlhs && lhs.v + 1U) {
 			i = lhs.v;
 			goto one;
 		}
@@ -241,7 +241,7 @@ phdr(const char *hdrs, const size_t *hoff)
 		size_t i;
 		size_t j = 0U;
 
-		if (!nlhs) {
+		if (!nlhs && lhs.v + 1U) {
 			i = lhs.v;
 			goto onh;
 		}
@@ -297,7 +297,7 @@ rset(const char *line, const size_t *coff)
 	}
 
 	/* make up dimension line */
-	if (!nlhs) {
+	if (!nlhs && lhs.v + 1U) {
 		const size_t of = coff[lhs.v + 0U];
 		const size_t eo = coff[lhs.v + 1U];
 		if (UNLIKELY(eo - of >= zdim)) {
@@ -305,6 +305,13 @@ rset(const char *line, const size_t *coff)
 			dim = realloc(dim, zdim * sizeof(*dim));
 		}
 		memcpy(dim, line + of, ndim = eo - of);
+	} else if (!nlhs) {
+		if (UNLIKELY(!zdim)) {
+			dim = malloc(8U);
+		}
+		ndim = 0U;
+		dim[ndim++] = '.';
+		ndim++;
 	} else for (size_t i = 0U, n = 0U; i < nlhs; i++, ndim = n) {
 		const size_t of = coff[lhs.p[i] + 0U];
 		const size_t eo = coff[lhs.p[i] + 1U];
@@ -532,7 +539,7 @@ static int
 chck(size_t ncol)
 {
 	if (!nlhs) {
-		if (UNLIKELY(lhs.v >= ncol)) {
+		if (UNLIKELY(lhs.v >= ncol && lhs.v + 1U)) {
 			return -1;
 		}
 	} else for (size_t i = 0U; i < nlhs; i++) {
@@ -595,10 +602,12 @@ hashln(const char *ln, size_t *of)
 {
 	uint64_t d = 0U;
 
-	if (!nlhs) {
+	if (!nlhs && lhs.v + 1U) {
 		const size_t bo = of[lhs.v + 0U];
 		const size_t eo = of[lhs.v + 1U];
 		d = hash(ln + bo, eo - bo - 1U);
+	} else if (!nlhs) {
+		d = ~d;
 	} else for (size_t i = 0U; i < nlhs; i++) {
 		const size_t bo = of[lhs.p[i] + 0U];
 		const size_t eo = of[lhs.p[i] + 1U];
@@ -705,7 +714,8 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 
 	one_l:
 		on = memchrnul(l, '+', elhs - l);
-		if ((x = strtoul(l, &tmp, 10)) && tmp == on) {
+		if ((x = strtoul(l, &tmp, 10)) && tmp == on ||
+		    tmp == on && !nlhs) {
 			x--;
 		} else if ((x = find_s(hn, of, nc, l, on - l)) < nc) {
 			;
@@ -909,6 +919,7 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 		}
 	}
 
+	mtcc();
 	while ((nrd = getline(&line, &llen, stdin)) > 0) {
 	tok:
 		nr++;
