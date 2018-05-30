@@ -3,7 +3,7 @@ dnl Autoconf startup.
 dnl -------------------------------------------------------------------------
 
 AC_PREREQ([2.64])
-AC_INIT([dtcl], [0.1.1.GIT], [https://github.com/hroptatyr/dtcl])
+AC_INIT([dtcl], [0.1.1], [https://github.com/hroptatyr/dtcl])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_MACRO_DIR([m4])
