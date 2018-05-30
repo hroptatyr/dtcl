@@ -55,7 +55,17 @@ echo
 echo "Build summary"
 echo "============="
 echo
-echo "Everything will be built"
+echo "[[x]] dtcast"
+echo "[[x]] dtmelt"
+echo "[[x]] dtrbind"
+echo "[[x]] lines"
+if test "${use_asm_corus}" = "yes"; then
+echo "[[x]] dtmerge"
+echo "[[x]] dtchanges"
+else
+echo "[[ ]] dtmerge  (coroutine support disabled)"
+echo "[[ ]] dtchanges  (coroutine support disabled)"
+fi
 echo
 
 ## configure ends here
