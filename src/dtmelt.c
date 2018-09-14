@@ -46,23 +46,17 @@
 #include "nifty.h"
 
 /* special value for ... on RHS */
-#define ELLIPSIS	(-2)
+#define ELLIPSIS	((void*)-1)
 
 static int hdrp = 0;
 static int cnmp = 0;
 
 /* idvars (our left hand side) */
 static size_t nlhs;
-static union {
-	size_t v;
-	size_t *p;
-} lhs = {-1};
+static size_t *lhs;
 /* measure vars (our right hand side) */
 static size_t nrhs;
-static union {
-	size_t v;
-	size_t *p;
-} rhs = {-1};
+static size_t *rhs;
 
 
 static void
@@ -92,50 +86,37 @@ memchrnul(const char *s, int c, size_t z)
 static int
 chck(size_t ncol)
 {
-	if (!nlhs) {
-		if (UNLIKELY(lhs.v >= ncol && lhs.v + 1U)) {
-			return -1;
-		}
-	} else for (size_t i = 0U; i < nlhs; i++) {
-		if (UNLIKELY(lhs.p[i] >= ncol)) {
+	for (size_t i = 0U; i < nlhs; i++) {
+		if (UNLIKELY(lhs[i] >= ncol)) {
 			return -1;
 		}
 	}
-	if (!nrhs) {
-		if (UNLIKELY(rhs.v >= ncol && rhs.v < ELLIPSIS)) {
-			return -1;
-		}
-	} else for (size_t i = 0U; i < nrhs; i++) {
-		if (UNLIKELY(rhs.p[i] >= ncol)) {
+	for (size_t i = 0U; i < nrhs; i++) {
+		if (UNLIKELY(rhs[i] >= ncol)) {
 			return -1;
 		}
 	}
-	if (UNLIKELY(!nlhs && !nrhs && !(lhs.v + 1U) && !(rhs.v + 1U))) {
+
+	/* they can't both be ellipses */
+	if (UNLIKELY(!nlhs && !nrhs)) {
 		return -1;
 	}
 
-	if (!nrhs && rhs.v == ELLIPSIS) {
+	if (rhs == ELLIPSIS) {
 		/* construct the set of measure vars */
-		nrhs = ncol - nlhs - 1 + (nlhs > 0);
+		nrhs = ncol - nlhs;
 		if (UNLIKELY(!nrhs)) {
 			return -1;
 		}
-		if (UNLIKELY(!(rhs.p = calloc(nrhs, sizeof(*rhs.p))))) {
+		if (UNLIKELY((rhs = calloc(nrhs, sizeof(*rhs))) == NULL)) {
 			return -1;
-		} else if (!nlhs) {
-			for (size_t i = 0U, j = 0U; i < ncol; i++) {
-				if (i == lhs.v) {
-					continue;
-				}
-				rhs.p[j++] = i;
-			}
 		} else for (size_t i = 0U, j = 0U; j < nrhs; i++) {
 			for (size_t k = 0U; k < nlhs; k++) {
-				if (i == lhs.p[k]) {
+				if (i == lhs[k]) {
 					goto found;
 				}
 			}
-			rhs.p[j++] = i;
+			rhs[j++] = i;
 		found:
 			continue;
 		}
@@ -146,15 +127,8 @@ chck(size_t ncol)
 static void
 phdr(const char *hdrs, const size_t *hoff, size_t nxph)
 {
-	size_t i, j = 0U;
-
-	if (!nlhs) {
-		i = lhs.v;
-		goto onh;
-	}
-	for (; j < nlhs; j++) {
-		i = lhs.p[j];
-	onh:;
+	for (size_t i, j = 0U; j < nlhs; j++) {
+		i = lhs[j];
 		const size_t of = hoff[i + 0U];
 		const size_t eo = hoff[i + 1U];
 		fwrite(hdrs + of, sizeof(*hdrs), eo - of - 1U, stdout);
@@ -162,7 +136,7 @@ phdr(const char *hdrs, const size_t *hoff, size_t nxph)
 	}
 	if (nxph <= 1U) {
 		fputs("variable\t", stdout);
-	} else for (j = 0U; j < nxph; j++) {
+	} else for (size_t j = 0U; j < nxph; j++) {
 		fprintf(stdout, "variable%zu", j + 1U);
 		fputc('\t', stdout);
 	}
@@ -175,14 +149,11 @@ cxph(char *restrict hn, const size_t *of)
 {
 /* check if we're dealing with headers from a cross-product (A*B) */
 	size_t n = 0U;
-	size_t i;
 
-	if (!nrhs) {
-		i = rhs.v;
-		goto onh;
-	} else {
-		i = rhs.p[0U];
-	onh:;
+	if (UNLIKELY(rhs == NULL)) {
+		return 0U;
+	}
+	with (size_t i = rhs[0U]) {
 		const size_t bo = of[i + 0U];
 		const size_t eo = of[i + 1U];
 		const char *const ep = hn + eo - 1U;
@@ -194,8 +165,8 @@ cxph(char *restrict hn, const size_t *of)
 	}
 	/* check the rest */
 	for (size_t j = 1U; j < nrhs; j++) {
-		const size_t bo = of[rhs.p[j] + 0U];
-		const size_t eo = of[rhs.p[j] + 1U];
+		const size_t bo = of[rhs[j] + 0U];
+		const size_t eo = of[rhs[j] + 1U];
 		const char *const ep = hn + eo - 1U;
 		size_t m = 0U;
 		for (char *restrict hp = hn + bo, *np;
@@ -298,13 +269,9 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 	for (nl = 0U, on = l; (on = memchr(on, '+', elhs - on)); nl++, on++);
 	for (nr = 0U, on = r; (on = memchr(on, '+', erhs - on)); nr++, on++);
 
-	if (nl && !(lhs.v + 1U)) {
-		lhs.p = calloc(nlhs = nl + 1U, sizeof(*lhs.p));
+	if (lhs == NULL) {
+		lhs = calloc(nlhs = nl + 1U, sizeof(*lhs));
 	}
-	if (nr && !(rhs.v + 1U)) {
-		rhs.p = calloc(nrhs = nr + 1U, sizeof(*rhs.p));
-	}
-
 	/* now try and snarf the whole shebang */
 	if (!nl) {
 		goto one_l;
@@ -322,28 +289,22 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 			;
 		} else {
 			/* retry next time */
-			if (lhs.v + 1U) {
-				free(lhs.p);
-			}
-			lhs.v = -1;
-			nlhs = 0U;
 			return -1;
 		}
 
-		if (!nlhs) {
-			lhs.v = x;
-		} else {
-			lhs.p[nl] = x;
-		}
+		lhs[nl] = x;
 	}
 
 	/* snarf right hand side */
 	if (!nr && !memcmp(r, "...\0", 4U)) {
-		if (!(rhs.v + 1U)) {
-			rhs.v = ELLIPSIS;
-		}
+		rhs = rhs ?: ELLIPSIS;
 		return 0;
-	} else if (!nr) {
+	}
+
+	if (rhs == NULL) {
+		rhs = calloc(nrhs = nr + 1U, sizeof(*rhs));
+	}
+	if (!nr) {
 		goto one_r;
 	}
 	for (nr = 0U; nr < nrhs && r < erhs; nr++, r = on + 1U) {
@@ -361,11 +322,7 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 			return -1;
 		}
 
-		if (!nrhs) {
-			rhs.v = x;
-		} else {
-			rhs.p[nr] = x;
-		}
+		rhs[nr] = x;
 	}
 	/* all is good, forget about the formula then */
 	form = NULL;
@@ -472,7 +429,7 @@ Error: product headers must have same number of factors");
 	}
 
 	while ((nrd = getline(&line, &llen, stdin)) > 0) {
-		size_t bo, eo, v, i;
+		size_t v, i;
 	tok:
 		nr++;
 		size_t nf = tokln1(coff, ncol, line, nrd);
@@ -485,16 +442,10 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 		}
 
 		/* construct constant dimension prefix */
-		i = 0U;
-		ndln = 0U;
-		if (!nlhs) {
-			bo = coff[lhs.v + 0U];
-			eo = coff[lhs.v + 1U];
-			goto one_l;
-		} else for (; i < nlhs; i++) {
-			bo = coff[lhs.p[i] + 0U];
-			eo = coff[lhs.p[i] + 1U];
-		one_l:
+		for (i = 0U, ndln = 0U; i < nlhs; i++) {
+			const size_t bo = coff[lhs[i] + 0U];
+			const size_t eo = coff[lhs[i] + 1U];
+
 			if (UNLIKELY(ndln + eo - bo > zdln)) {
 				/* resize */
 				while ((zdln = (zdln * 2U) ?: 256U) <=
@@ -506,17 +457,11 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 			dln[ndln++] = '\t';
 		}
 
-		i = 0U;
-		if (!nrhs) {
-			bo = coff[rhs.v + 0U];
-			eo = coff[rhs.v + 1U];
-			v = rhs.v;
-			goto one_r;
-		} else for (; i < nrhs; i++) {
-			bo = coff[rhs.p[i] + 0U];
-			eo = coff[rhs.p[i] + 1U];
-			v = rhs.p[i];
-		one_r:
+		for (i = 0U; i < nrhs; i++) {
+			const size_t bo = coff[rhs[i] + 0U];
+			const size_t eo = coff[rhs[i] + 1U];
+			v = rhs[i];
+
 			fwrite(dln, sizeof(*dln), ndln, stdout);
 			/* header or index */
 			with (size_t hb = hoff[v + 0U], he = hoff[v + 1U]) {
@@ -566,11 +511,11 @@ Error: cannot interpret formula");
 
 	rc = proc1() < 0;
 
-	if (nlhs) {
-		free(lhs.p);
+	if (lhs != ELLIPSIS) {
+		free(lhs);
 	}
-	if (nrhs) {
-		free(rhs.p);
+	if (rhs != ELLIPSIS) {
+		free(rhs);
 	}
 out:
 	yuck_free(argi);
