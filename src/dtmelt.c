@@ -339,7 +339,9 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 
 	/* snarf right hand side */
 	if (!nr && !memcmp(r, "...\0", 4U)) {
-		rhs.v = ELLIPSIS;
+		if (!(rhs.v + 1U)) {
+			rhs.v = ELLIPSIS;
+		}
 		return 0;
 	} else if (!nr) {
 		goto one_r;
@@ -389,7 +391,6 @@ proc1(void)
 	size_t ndln = 0U;
 	size_t zdln = 0U;
 	char *dln = NULL;
-	int chkd;
 
 	/* probe */
 	if (UNLIKELY((nrd = getline(&line, &llen, stdin)) < 0)) {
@@ -404,7 +405,7 @@ Error: cannot read lines");
 Error: cannot determine number of columns");
 		rc = -1;
 		goto out;
-	} else if (UNLIKELY((chkd = chck(ncol)) < !hdrp - 1)) {
+	} else if (UNLIKELY(chck(ncol) < !hdrp - 1)) {
 		errno = 0, error("\
 Error: fewer columns present than needed for id or measure vars");
 		rc = -1;
@@ -446,9 +447,7 @@ Error: cannot allocate memory to hold a copy of the header");
 		hn[hoff[i] - 1U] = '\0';
 	}
 	/* we might need to rescan the formula now */
-	if (chkd >= 0) {
-		;
-	} else if (UNLIKELY(snrf(NULL, hn, hoff, ncol)) < 0) {
+	if (UNLIKELY(snrf(NULL, hn, hoff, ncol)) < 0) {
 		error("\
 Error: cannot interpret formula");
 		rc = -1;
