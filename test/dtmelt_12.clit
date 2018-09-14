@@ -1,0 +1,9 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ < "${srcdir}/cast_01.csv" dtmelt -H '1~sym' --col-names
+date	variable	value
+2009-03-12	sym	AX
+2009-03-12	sym	BZX
+2009-03-13	sym	AX
+2009-03-13	sym	BZX
+$
