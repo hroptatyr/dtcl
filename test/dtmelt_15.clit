@@ -1,0 +1,9 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ tail -n +2 "${srcdir}/cast_01.csv" | dtmelt '2' --col-names
+V2
+AX
+BZX
+AX
+BZX
+$

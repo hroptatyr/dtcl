@@ -132,9 +132,11 @@ phdr(const char *hdrs, const size_t *hoff, size_t nxph)
 		const size_t of = hoff[i + 0U];
 		const size_t eo = hoff[i + 1U];
 		fwrite(hdrs + of, sizeof(*hdrs), eo - of - 1U, stdout);
-		fputc('\t', stdout);
+		fputc('\t' + (!nrhs && j + 1U >= nlhs), stdout);
 	}
-	if (nxph <= 1U) {
+	if (!nrhs) {
+		return;
+	} else if (nxph <= 1U) {
 		fputs("variable\t", stdout);
 	} else for (size_t j = 0U; j < nxph; j++) {
 		fprintf(stdout, "variable%zu", j + 1U);
@@ -151,7 +153,7 @@ cxph(char *restrict hn, const size_t *of)
 	size_t n = 0U;
 
 	if (UNLIKELY(rhs == NULL)) {
-		return 0U;
+		return 1U;
 	}
 	with (size_t i = rhs[0U]) {
 		const size_t bo = of[i + 0U];
@@ -260,15 +262,21 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 	if (UNLIKELY((formula = form ?: formula) == NULL)) {
 		return !form - 1;
 	}
-	if ((elhs = strchr(l = form = formula, '~')) == NULL) {
-		return -1;
+	if (UNLIKELY((elhs = strchr(l = form = formula, '~')) == NULL)) {
+		elhs = l + strlen(l);
+		r = erhs = elhs;
+	} else {
+		r = elhs + 1U;
+		erhs = r + strlen(r);
 	}
-	r = elhs + 1U;
-	erhs = r + strlen(r);
 
 	for (nl = 0U, on = l; (on = memchr(on, '+', elhs - on)); nl++, on++);
 	for (nr = 0U, on = r; (on = memchr(on, '+', erhs - on)); nr++, on++);
 
+	if (!nl && *l == '~') {
+		lhs = lhs ?: ELLIPSIS;
+		goto rhs;
+	}
 	if (lhs == NULL) {
 		lhs = calloc(nlhs = nl + 1U, sizeof(*lhs));
 	}
@@ -295,12 +303,15 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 		lhs[nl] = x;
 	}
 
+rhs:
 	/* snarf right hand side */
 	if (!nr && !memcmp(r, "...\0", 4U)) {
 		rhs = rhs ?: ELLIPSIS;
-		return 0;
+		goto fin;
+	} else if (r == erhs) {
+		/* no right side */
+		goto fin;
 	}
-
 	if (rhs == NULL) {
 		rhs = calloc(nrhs = nr + 1U, sizeof(*rhs));
 	}
@@ -324,6 +335,8 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 
 		rhs[nr] = x;
 	}
+
+fin:
 	/* all is good, forget about the formula then */
 	form = NULL;
 	return 0;
@@ -457,6 +470,12 @@ Error: line %zu has only %zu columns, expected %zu", nr, nf, ncol);
 			dln[ndln++] = '\t';
 		}
 
+		if (UNLIKELY(!nrhs)) {
+			/* last tab to newline */
+			dln[ndln - 1U]++;
+			fwrite(dln, sizeof(*dln), ndln, stdout);
+			continue;
+		}
 		for (i = 0U; i < nrhs; i++) {
 			const size_t bo = coff[rhs[i] + 0U];
 			const size_t eo = coff[rhs[i] + 1U];
