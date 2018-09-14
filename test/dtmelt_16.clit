@@ -1,0 +1,9 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ < "${srcdir}/cast_01.csv" dtmelt -H 'sym' --col-names
+sym
+AX
+BZX
+AX
+BZX
+$

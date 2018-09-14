@@ -70,6 +70,11 @@ TESTS += dtmelt_08.clit
 TESTS += dtmelt_09.clit
 TESTS += dtmelt_10.clit
 TESTS += dtmelt_11.clit
+TESTS += dtmelt_12.clit
+TESTS += dtmelt_13.clit
+TESTS += dtmelt_14.clit
+TESTS += dtmelt_15.clit
+TESTS += dtmelt_16.clit
 
 TESTS += dtrbind_01.clit
 TESTS += dtrbind_02.clit
