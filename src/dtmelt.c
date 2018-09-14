@@ -309,7 +309,7 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 	if (!nl) {
 		goto one_l;
 	}
-	for (nl = 0U; nl < nlhs; nl++, l = on + 1U) {
+	for (nl = 0U; nl < nlhs && l < elhs; nl++, l = on + 1U) {
 		/* try with numbers first */
 		char *tmp;
 		long unsigned int x;
@@ -344,7 +344,7 @@ snrf(const char *formula, const char *hn, const size_t *of, size_t nc)
 	} else if (!nr) {
 		goto one_r;
 	}
-	for (nr = 0U; nr < nrhs; nr++, r = on + 1U) {
+	for (nr = 0U; nr < nrhs && r < erhs; nr++, r = on + 1U) {
 		/* try with numbers first */
 		char *tmp;
 		long unsigned int x;
